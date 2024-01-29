@@ -1,0 +1,24 @@
+---
+title: "Title"
+author: "Name"
+date: 2024-01-28
+---
+
+## Preparation
+
+Load libraries
+```{r}
+library(tidyverse)
+library(here)
+```
+
+
+Read in Data
+```{r}
+# read in tree ring data
+rwi_long <- read_csv(here("~/../../capstone/climatree/dataverse-archive/rwi_long.csv"))
+
+# view tree ring data head
+head(rwi_long, 2)
+```
+
