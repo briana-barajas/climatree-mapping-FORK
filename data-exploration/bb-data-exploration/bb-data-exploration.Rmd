@@ -23,5 +23,25 @@ rwi_long <- read_csv(here("~/../../capstone/climatree/dataverse-archive/rwi_long
 
 # view header
 head(rwi_long, 2)
+
+```
+## Selecting Tree Species
+```{r}
+# create df with counts of collection ID
+collection_id_count <- plyr::count(rwi_long$collection_id) %>% 
+  rename(collection_id = x)
+
+# plot top 30 collection ID counts
+collection_id_count %>% 
+  slice_max(order_by = freq, n = 15) %>% 
+  ggplot() +
+  geom_col(aes(x = fct_reorder(collection_id, freq), y = freq)) +
+  labs(x = "Collection ID",
+       y = "Number of Rows (Individuals Tree Cores)",
+       title = "15 Most Sampled Sites") +
+  geom_text(aes(x = fct_reorder(collection_id, freq), y = freq,
+                label = freq), hjust = 1.2, color = "white") +
+  coord_flip() +
+  theme_minimal() 
 ```
 
