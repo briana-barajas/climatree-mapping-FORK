@@ -5,43 +5,104 @@ date: 2024-01-28
 ---
 
 ## Preparation
+
 Set-up chunk
+
 ```{r}
 knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 ```
 
 Load libraries
+
 ```{r}
 library(tidyverse)
 library(here)
 ```
 
 Read in Data
+
 ```{r}
 # read in tree ring data
 rwi_long <- read_csv(here("~/../../capstone/climatree/dataverse-archive/rwi_long.csv"))
 
-# view header
-head(rwi_long, 2)
+# read in site summary table
+site_summary <- read_table(here("~/../../capstone/climatree/dataverse-archive/site_summary.tab"))
+
+# read in species metadata
+species_metadata <- read_table(here("~/../../capstone/climatree/dataverse-archive/species_metadata.tab"))
+
+# essential cwd data
+essential_cwd <- read_csv(here("~/../../capstone/climatree/dataverse-archive/essentialcwd_data.csv"))
 
 ```
+
 ## Selecting Tree Species
-```{r}
+
+```{r, join}
+
+# remove quotes from `collection_id` column in site data ----
+site_summary <- site_summary %>% 
+  mutate(collection_id = str_remove_all(collection_id, "\""))
+
+# capitalize`sp_id` column in species metadata ----
+species_metadata <- species_metadata %>% 
+  rename(sp_id = species_id) %>% 
+  mutate(sp_id = toupper(sp_id))
+
+# join data ----
+rwi_species <- rwi_long %>%
+  
+  # drop extra columns
+  select(-c(rwi_ar, rwi_nb)) %>% 
+  
+  # join rwi_long to site_summary by collection_id
+  left_join(y = site_summary, by = 'collection_id') %>% 
+  
+  # drop extra columns
+  select(collection_id, core_id, tree, core, year, rwi, rwl, sp_id) %>%
+  
+  # left join to species metadata, by species id
+  left_join(y = species_metadata, by = 'sp_id') %>% 
+  
+  # drop extra columns
+  select(-c(source, spp)) %>% 
+  
+  # remove quotes from strings in genus and species column
+  mutate(genus = str_remove_all(genus, "\""),
+         species = str_remove_all(species, "\"")) %>% 
+  
+  # combine genus and species into a single column
+  mutate(genus_species = str_c(genus, " ", species))
+
+```
+
+```{r, plot join}
 # create df with counts of collection ID
-collection_id_count <- plyr::count(rwi_long$collection_id) %>% 
-  rename(collection_id = x)
+sp_count <- plyr::count(rwi_species$sp_id) %>% 
+  rename(sp_id = x)
 
 # plot top 30 collection ID counts
-collection_id_count %>% 
+sp_count %>% 
   slice_max(order_by = freq, n = 15) %>% 
   ggplot() +
-  geom_col(aes(x = fct_reorder(collection_id, freq), y = freq)) +
-  labs(x = "Collection ID",
-       y = "Number of Rows (Individuals Tree Cores)",
-       title = "15 Most Sampled Sites") +
-  geom_text(aes(x = fct_reorder(collection_id, freq), y = freq,
+  geom_col(aes(x = fct_reorder(sp_id, freq), y = freq)) +
+  labs(x = "Species ID",
+       y = "Number of Samples",
+       title = "15 Most Sampled Species") +
+  geom_text(aes(x = fct_reorder(sp_id, freq), y = freq,
                 label = freq), hjust = 1.2, color = "white") +
   coord_flip() +
   theme_minimal() 
 ```
 
+**NOTE:** I found a discrepancy in the number of species. There are some NAs in the `species_metadata` that affected the new `genus_species` column I created. Therefore, there's more species ID's than there are associated species and genus names. The plot above is created using only species ID, but if we want to use species as a searchable map item we have to consider how we'll manage NAs. 
+
+```{r}
+# print differences in the number of unique species
+glue::glue("Number of unique genus_species: {length(unique(rwi_species$genus_species))}
+           Number of unique sp_id: {length(unique(rwi_species$sp_id))}
+           Number of unique common_name:{length(unique(rwi_species$common_name))}")
+
+# view distribution of NAs
+colSums(is.na(rwi_species))
+```
