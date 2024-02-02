@@ -12,7 +12,7 @@ Set-up chunk
 knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 ```
 
-Load libraries
+Load libraries=
 
 ```{r}
 library(tidyverse)
@@ -29,7 +29,7 @@ rwi_long <- read_csv(here("~/../../capstone/climatree/dataverse-archive/rwi_long
 site_summary <- read_table(here("~/../../capstone/climatree/dataverse-archive/site_summary.tab"))
 
 # read in species metadata
-species_metadata <- read_table(here("~/../../capstone/climatree/dataverse-archive/species_metadata.tab"))
+species_metadata <- read_csv(here("~/../../capstone/climatree/dataverse-archive/species_metadata.csv"))
 
 # essential cwd data
 essential_cwd <- read_csv(here("~/../../capstone/climatree/dataverse-archive/essentialcwd_data.csv"))
@@ -38,11 +38,27 @@ essential_cwd <- read_csv(here("~/../../capstone/climatree/dataverse-archive/ess
 
 ## Selecting Tree Species
 
-```{r, join}
-
+```{r}
 # remove quotes from `collection_id` column in site data ----
 site_summary <- site_summary %>% 
   mutate(collection_id = str_remove_all(collection_id, "\""))
+
+# join data ---
+rwi_species <- rwi_long %>% 
+  
+  # drop extra columns
+  select(c(collection_id, year, rwi)) %>% 
+  
+  # join rwi to site_summary by collection id
+  left_join(y = site_summary, by = 'collection_id') %>% 
+  
+  # drop extra columns
+  select(collection_id, rwi, latitude, longitude, sp_id)
+```
+
+```{r, join}
+
+
 
 # capitalize`sp_id` column in species metadata ----
 species_metadata <- species_metadata %>% 
@@ -76,12 +92,12 @@ rwi_species <- rwi_long %>%
 
 ```
 
-```{r, plot join}
+```{r, plot top spp}
 # create df with counts of collection ID
 sp_count <- plyr::count(rwi_species$sp_id) %>% 
   rename(sp_id = x)
 
-# plot top 30 collection ID counts
+# plot top 15 collection ID counts
 sp_count %>% 
   slice_max(order_by = freq, n = 15) %>% 
   ggplot() +
@@ -93,7 +109,22 @@ sp_count %>%
                 label = freq), hjust = 1.2, color = "white") +
   coord_flip() +
   theme_minimal() 
+
+# plot top 15 genus_species
+sp_count %>% 
+  slice_max(order_by = freq, n = 15) %>% 
+  ggplot() +
+  geom_col(aes(x = fct_reorder(genus_species, freq), y = freq)) +
+  labs(x = "Genus Species",
+       y = "Number of Samples",
+       title = "15 Most Sampled Species") +
+  geom_text(aes(x = fct_reorder(genus_species, freq), y = freq,
+                label = freq), hjust = 1.2, color = "white") +
+  coord_flip() +
+  theme_minimal() 
 ```
+
+
 
 **NOTE:** I found a discrepancy in the number of species. There are some NAs in the `species_metadata` that affected the new `genus_species` column I created. Therefore, there's more species ID's than there are associated species and genus names. The plot above is created using only species ID, but if we want to use species as a searchable map item we have to consider how we'll manage NAs. In addition to the NAs, there are some columns where genus and species are listed as "et al".
 
