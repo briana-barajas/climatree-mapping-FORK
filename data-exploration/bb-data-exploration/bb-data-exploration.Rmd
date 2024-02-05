@@ -12,16 +12,23 @@ Set-up chunk
 knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 ```
 
-Load libraries=
+Load libraries
 
 ```{r}
 library(tidyverse)
 library(here)
+library(sf) # vector data
+library(tmap) # mapping
 ```
 
-Read in Data
+## Find 20 Most Sampled Species
+
+### Read in Data
 
 ```{r}
+## ==================================================
+##                 read in data                  ----
+## ==================================================
 # read in tree ring data
 rwi_long <- read_csv(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "rwi_long.csv"))
 
@@ -39,6 +46,9 @@ essential_cwd <- read_csv(here("~","..", "..", "capstone", "climatree", "dataver
 ## Selecting Tree Species
 
 ```{r}
+## ==================================================
+##                 join data frames              ----
+## ==================================================
 # capitalize`sp_id` column in species metadata ----
 species_metadata <- species_metadata %>% 
   rename(sp_id = species_id) %>% 
@@ -52,29 +62,32 @@ site_summary <- site_summary %>%
 # join data ---
 rwi_species <- rwi_long %>% 
   
-  # drop extra columns
-  select(c(collection_id, year, rwi)) %>% 
+  # # drop extra columns
+  # select(c(collection_id, year, rwi)) %>% 
   
   # join rwi to site_summary by collection id
   left_join(y = site_summary, by = 'collection_id') %>% 
   
-  # drop extra columns
-  select(collection_id, rwi, latitude, longitude, sp_id) %>% 
+  # # drop extra columns
+  # select(collection_id, rwi, latitude, longitude, sp_id) %>% 
   
-  # join with species metadata
-  left_join(y = species_metadata, by = "sp_id") %>% 
+  #join with species metadata
+  left_join(y = species_metadata, by = "sp_id") #%>%
   
-  # drop select columns
-  select(-c(source, gymno_angio, family, source))
+  # # drop select columns
+  # select(-c(source, gymno_angio, family, source))
 ```
 
 
 ```{r, plot top spp}
+## ==================================================
+##                  plot 20 top spp              ----
+## ==================================================
 # create df with counts of collection ID
 sp_count <- plyr::count(rwi_species$spp) %>% 
   rename(spp = x)
 
-# plot top 15 collection ID counts
+# plot top 20 collection ID counts
 sp_count %>% 
   drop_na(spp) %>% 
   slice_max(order_by = freq, n = 20) %>% 
@@ -87,6 +100,32 @@ sp_count %>%
                 label = freq), hjust = 1.2, color = "white", size = 2.5) +
   coord_flip() +
   theme_minimal() 
+```
+
+```{r}
+## ==================================================
+##                 create psme subset            ----
+## ==================================================
+# subset most sampled species
+psme_rwi <- rwi_species %>% 
+  filter(spp == "Pseudotsuga menziesii")
+```
+
+```{r}
+## ==================================================
+##                 PSME RANGE MAP                ----
+## ==================================================
+
+# define query for psme 
+query <- "SELECT * FROM merged_ranges_dissolve WHERE sp_code='psme' "
+
+# read in psme geometry data
+psme_range <- st_read(here("~", "..", "..", "capstone", "climatree", "dataverse-archive",  "merged_ranges_dissolve.shp"), query = query) %>% 
+  st_make_valid()
+
+ 
+tm_shape(psme_range) +
+  tm_polygons()
 ```
 
 
