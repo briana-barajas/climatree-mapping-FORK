@@ -1,0 +1,93 @@
+---
+title: "PSME Preliminary Maps"
+subtitle: "Vulnerability mapping for a single species, Pseudotsuga menziesii"
+author: "Briana Barajas"
+date: 2024-02-12
+----
+
+## Preparation
+
+```{r}
+
+```
+
+Libraries
+```{r}
+library(sf)     # vector data
+library(terra)  # raster data
+library(tmap)   # mapping
+```
+
+
+## Read in Data
+
+```{r}
+## ==================================================
+##                  dendro data                  ----
+## ==================================================
+# rwi for psme, exported in 1-data-exploration
+psme_rwi <- read_csv()
+
+# essential cwd data (3b.R site-specific historic climate data)
+site_clim <- read_csv(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "essentialcwd_data.csv"))
+```
+
+
+
+```{r read range shp}
+## ==================================================
+##                 PSME range map                ----
+## ==================================================
+
+# define query for psme range
+query <- "SELECT * FROM merged_ranges_dissolve WHERE sp_code='psme' "
+
+# read in psme geometry data
+psme_range <- st_read(here("~", "..", "..", "capstone", "climatree", "dataverse-archive",  "merged_ranges_dissolve.shp"), query = query) %>% 
+  st_make_valid()
+
+# plot psme range
+tm_shape(psme_range) +
+  tm_polygons()
+```
+## Climate Variables
+### Historic aet and pwd
+```{r}
+## ==================================================
+##              prep clim raster data           ----
+## ==================================================
+
+# ..... read in climate files .....             ----
+load(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "HistoricCWD_AETGrids_Annual.Rdat"))
+
+# take mean of raster stack (combine years?)
+cwd_historic <- mean(cwd_historic) 
+aet_historic <- mean(aet_historic)
+
+# calc historic pet ----
+pet_historic <- aet_historic + cwd_historic
+
+# plot data ----
+tm_shape(pet_historic) +
+  tm_raster()
+
+```
+
+### CMIP5 Climate Projections
+```{r}
+
+```
+
+__Question:__ In the previous __3b. Species niche.R__ work, `cwd_historic` is the `mean(cwd_historic)`. Why are there multiple rasters for each climate variable if the mean was already taken? Or is `cwd_historic` downloaded as annual data, and we need to apply the `mean()` function independently?
+
+```{r}
+## ==================================================
+##            site-specific clim data            ----
+## ==================================================
+
+# update site_id column
+site_clim <- site_clim %>% 
+  mutate("site_id" = as.character(site)) %>% 
+  rename(location_id = site_id)
+
+```
