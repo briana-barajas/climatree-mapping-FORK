@@ -17,13 +17,15 @@ Load libraries
 ```{r}
 library(tidyverse)
 library(here)
+
 library(sf) # vector data
+library(terra) #raster data
 library(tmap) # mapping
 ```
 
 ## Find 20 Most Sampled Species
 
-### Read in Data
+### Read Dendro Data
 
 ```{r}
 ## ==================================================
@@ -33,49 +35,57 @@ library(tmap) # mapping
 rwi_long <- read_csv(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "rwi_long.csv"))
 
 # read in site summary table
-site_summary <- read_table(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "site_summary.tab"))
+site_smry <- read_table(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "site_summary.tab"))
 
 # read in species metadata
 species_metadata <- read_csv(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "species_metadata.csv"))
 
-# essential cwd data
-essential_cwd <- read_csv(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "essentialcwd_data.csv"))
+# essential cwd data (3b.R site-specific historic climate data)
+site_clim <- read_csv(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "essentialcwd_data.csv"))
 
 ```
 
-## Selecting Tree Species
+### Filter Tree Species
 
 ```{r}
 ## ==================================================
-##                 join data frames              ----
+##                 prep for join                ----
 ## ==================================================
-# capitalize`sp_id` column in species metadata ----
+
+# ...... update species metadata ......
 species_metadata <- species_metadata %>% 
-  rename(sp_id = species_id) %>% 
-  mutate(sp_id = toupper(sp_id))
+  rename(sp_code = species_id)
 
-# remove quotes from columns in site data ----
-site_summary <- site_summary %>% 
+
+# ..... update site smry data .....
+site_smry <- site_smry %>%
+  select(collection_id, sp_id) %>% 
+  mutate(location_id = collection_id) %>%
+  
+  # change sp_id to lower case
+  mutate(sp_code = tolower(sp_id)) %>% 
+  
+  # remove sp_id column
+  select(-sp_id) %>%
+  
+  # remove quotes around strings
   mutate(collection_id = str_remove_all(collection_id, "\""),
-         sp_id = str_remove_all(sp_id, "\""))
+         sp_code = str_remove_all(sp_code, "\""),
+         location_id = str_remove_all(location_id, "\""))
 
-# join data ---
+
+## ==================================================
+##                   join data                   ----
+## ==================================================
+
+# ..... join rwi, metadata, and site summary .....
 rwi_species <- rwi_long %>% 
   
-  # # drop extra columns
-  # select(c(collection_id, year, rwi)) %>% 
-  
   # join rwi to site_summary by collection id
-  left_join(y = site_summary, by = 'collection_id') %>% 
-  
-  # # drop extra columns
-  # select(collection_id, rwi, latitude, longitude, sp_id) %>% 
+  left_join(y = site_smry, by = 'collection_id') %>% 
   
   #join with species metadata
-  left_join(y = species_metadata, by = "sp_id") #%>%
-  
-  # # drop select columns
-  # select(-c(source, gymno_angio, family, source))
+  left_join(y = species_metadata, by = "sp_code") #%>%
 ```
 
 
@@ -101,8 +111,8 @@ sp_count %>%
   coord_flip() +
   theme_minimal() 
 ```
-
-```{r}
+### Subset PSME
+```{r psme subset}
 ## ==================================================
 ##                 create psme subset            ----
 ## ==================================================
@@ -111,22 +121,62 @@ psme_rwi <- rwi_species %>%
   filter(spp == "Pseudotsuga menziesii")
 ```
 
-```{r}
+```{r read range shp}
 ## ==================================================
-##                 PSME RANGE MAP                ----
+##                 PSME range map                ----
 ## ==================================================
 
-# define query for psme 
+# define query for psme range
 query <- "SELECT * FROM merged_ranges_dissolve WHERE sp_code='psme' "
 
 # read in psme geometry data
 psme_range <- st_read(here("~", "..", "..", "capstone", "climatree", "dataverse-archive",  "merged_ranges_dissolve.shp"), query = query) %>% 
   st_make_valid()
 
- 
+# plot psme range
 tm_shape(psme_range) +
   tm_polygons()
 ```
+## Climate Variables
+### Historic aet and pwd
+```{r}
+## ==================================================
+##              prep clim raster data           ----
+## ==================================================
 
+# ..... read in climate files .....             ----
+load(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "HistoricCWD_AETGrids_Annual.Rdat"))
+
+# take mean of raster stack (combine years?)
+cwd_historic <- mean(cwd_historic) 
+aet_historic <- mean(aet_historic)
+
+# calc historic pet ----
+pet_historic <- aet_historic + cwd_historic
+
+# plot data ----
+tm_shape(pet_historic) +
+  tm_raster()
+
+```
+
+### CMIP5 Climate Projections
+```{r}
+
+```
+
+__Question:__ In the previous __3b. Species niche.R__ work, `cwd_historic` is the `mean(cwd_historic)`. Why are there multiple rasters for each climate variable if the mean was already taken? Or is `cwd_historic` downloaded as annual data, and we need to apply the `mean()` function independently?
+
+```{r}
+## ==================================================
+##            site-specific clim data            ----
+## ==================================================
+
+# update site_id column
+site_clim <- site_clim %>% 
+  mutate("site_id" = as.character(site)) %>% 
+  rename(location_id = site_id)
+
+```
 
 
