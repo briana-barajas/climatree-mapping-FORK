@@ -8,11 +8,11 @@ date: 2024-02-12
 ## Preparation
 
 ```{r}
-
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 ```
 
 Libraries
-```{r}
+```{r, results = 'hide'}
 library(sf)     # vector data
 library(terra)  # raster data
 library(tmap)   # mapping
@@ -26,7 +26,7 @@ library(tmap)   # mapping
 ##                  dendro data                  ----
 ## ==================================================
 # rwi for psme, exported in 1-data-exploration
-psme_rwi <- read_csv()
+psme_rwi <- read_csv(here("~", "..", "..", "capstone", "climatree", "output-data", "step-1-output", "psme_rwi.csv"))
 
 # essential cwd data (3b.R site-specific historic climate data)
 site_clim <- read_csv(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "essentialcwd_data.csv"))
