@@ -1,9 +1,9 @@
 ---
 title: "PSME Preliminary Maps"
-subtitle: "Vulnerability mapping for a single species, Pseudotsuga menziesii"
+subtitle: "Preliminary maps and spatial analysis for seudotsuga menziesii"
 author: "Briana Barajas"
 date: 2024-02-12
-----
+---
 
 ## Preparation
 
@@ -11,27 +11,24 @@ date: 2024-02-12
 knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 ```
 
-Libraries
-```{r, results = 'hide'}
+```{r}
+library(tidyverse)
+library(here)
+
 library(sf)     # vector data
 library(terra)  # raster data
 library(tmap)   # mapping
 ```
 
-
-## Read in Data
+## Load Data
 
 ```{r}
-## ==================================================
-##                  dendro data                  ----
-## ==================================================
-# rwi for psme, exported in 1-data-exploration
+# load psme rwi
 psme_rwi <- read_csv(here("~", "..", "..", "capstone", "climatree", "output-data", "step-1-output", "psme_rwi.csv"))
 
 # essential cwd data (3b.R site-specific historic climate data)
 site_clim <- read_csv(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "essentialcwd_data.csv"))
 ```
-
 
 
 ```{r read range shp}
@@ -50,6 +47,7 @@ psme_range <- st_read(here("~", "..", "..", "capstone", "climatree", "dataverse-
 tm_shape(psme_range) +
   tm_polygons()
 ```
+
 ## Climate Variables
 ### Historic aet and pwd
 ```{r}
@@ -91,3 +89,4 @@ site_clim <- site_clim %>%
   rename(location_id = site_id)
 
 ```
+
