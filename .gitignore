@@ -3,4 +3,7 @@
 .RData
 .Ruserdata
 *.html
-/data
+*/data/
+data/
+*.csv
+*/*.csv
