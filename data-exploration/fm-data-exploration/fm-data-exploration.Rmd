@@ -11,41 +11,25 @@ Load libraries
 library(tidyverse)
 library(here)
 library(dplyr)
+library(terra)
+library(sf)
 ```
 
 
 Read in Data
 ```{r}
 # read in tree ring data
-rwi_long <- read_csv(here("~/../../capstone/climatree/dataverse-archive/rwi_long.csv"))
+rwi_long <- read_csv(here("~", "..", "..", "capstone", "climatree", "dataverse-archive", "rwi_long.csv"))
 
-# view tree ring data head
-glimpse(rwi_long, 2)
+# read in site summary table
+site_smry <- read_table(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "site_summary.tab"))
+
+# read in species metadata
+species_metadata <- read_csv(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "species_metadata.csv"))
 ```
 
-```{r}
-# Find all unique species and counts of collection sites for each 
-prefix_counts <- rwi_long %>%
-  mutate(prefix = gsub("\\d.*", "", collection_id)) %>% # Extract the prefix
-  distinct(prefix, collection_id, .keep_all = TRUE) %>%  # Keep only distinct rows based on prefix and collection_id
-  group_by(prefix) %>%
-  summarise(count = n_distinct(collection_id))
-```
 
 ```{r}
-# Find 20 species with most collection sites
-top_20 <- prefix_counts %>%
-  top_n(20, count) %>% 
-  arrange(desc(count))
-```
-
-```{r}
-# display top 20 in histogram
-ggplot(top_20, aes(x = fct_reorder(prefix, +count), y = count)) +
-  geom_bar(stat = "identity") +
-  coord_flip() +
-  xlab("Tree Species") +
-  labs(title = "Top 20 Tree Species by Number of Collection Sites")
-
+cwd_long <- read_csv(here("~/../../capstone/climatree/dataverse-archive/essentialcwd_data.csv"))
 ```
 
