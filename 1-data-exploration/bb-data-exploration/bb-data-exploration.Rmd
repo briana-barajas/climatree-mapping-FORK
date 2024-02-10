@@ -32,7 +32,7 @@ library(here)
 rwi_long <- read_csv(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "rwi_long.csv"))
 
 # read in site summary table
-site_smry <- read_table(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "site_summary.tab"))
+site_smry <- read_csv(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "site_summary.csv"))
 
 # read in species metadata
 species_metadata <- read_csv(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "species_metadata.csv"))
@@ -44,6 +44,16 @@ species_metadata <- read_csv(here("~","..", "..", "capstone", "climatree", "data
 ## ==================================================
 ##                 prep for join                ----
 ## ==================================================
+
+# ...... update rwi data ......
+rwi_clean <- rwi_long %>% 
+  
+  # remove cols not being used to speed up join 
+  select(-c(rwl, rwi_ar, rwi_nb)) %>% 
+  
+  # filter out predictive sample years (2019-2065)
+  filter(year < 2019)
+
 
 # ...... update species metadata ......
 species_metadata <- species_metadata %>% 
@@ -59,35 +69,38 @@ site_smry <- site_smry %>%
   mutate(sp_code = tolower(sp_id)) %>% 
   
   # remove sp_id column
-  select(-sp_id) %>%
-  
-  # remove quotes around strings
-  mutate(collection_id = str_remove_all(collection_id, "\""),
-         sp_code = str_remove_all(sp_code, "\""),
-         location_id = str_remove_all(location_id, "\""))
-
+  select(-sp_id)
 
 ## ==================================================
 ##                   join data                   ----
 ## ==================================================
 
 # ..... join rwi, metadata, and site summary .....
-rwi_species <- rwi_long %>% 
+rwi_species <- rwi_clean %>% 
   
   # join rwi to site_summary by collection id
   left_join(y = site_smry, by = 'collection_id') %>% 
   
   #join with species metadata
-  left_join(y = species_metadata, by = "sp_code") #%>%
+  left_join(y = species_metadata, by = "sp_code")
 ```
 
 ### Plot Species With Most Tree-Ring Samples
+
 ```{r, plot top spp}
 ## ==================================================
 ##                  plot 20 top spp              ----
 ## ==================================================
-# create df with counts of collection ID
-sp_count <- plyr::count(rwi_species$spp) %>% 
+
+# ..... create df listing individual trees .....
+indv_tree_spp <- rwi_species %>% 
+  group_by(tree) %>% 
+  summarise(sp_code = first(sp_code), 
+            spp = first(spp),
+            common_name = first(common_name))
+
+# ..... count occurence of each species .....
+sp_count <- plyr::count(indv_tree_spp$spp) %>% 
   rename(spp = x)
 
 # plot top 20 collection ID counts
@@ -95,12 +108,13 @@ sp_count %>%
   drop_na(spp) %>% 
   slice_max(order_by = freq, n = 20) %>% 
   ggplot() +
-  geom_col(aes(x = fct_reorder(spp, freq), y = freq)) +
+  geom_col(aes(x = fct_reorder(spp, freq), y = freq), fill = "green4") +
   labs(x = "Genus Species",
        y = "Number of Samples",
-       title = "20 Most Sampled Species") +
+       title = "20 Most Sampled Tree Species",
+       subtitle = "Using number of individual trees sampled") +
   geom_text(aes(x = fct_reorder(spp, freq), y = freq,
-                label = freq), hjust = 1.2, color = "white", size = 2.5) +
+                label = freq), hjust = 1.2, color = "white", size = 3) +
   coord_flip() +
   theme_minimal() 
 ```
