@@ -126,13 +126,13 @@ sp_count %>%
 ##                 create psme subset            ----
 ## ==================================================
 # subset most sampled species
-psme_rwi <- rwi_species %>% 
+pcma_rwi <- rwi_species %>% 
   filter(spp == "Pseudotsuga menziesii")
 
 ## ==================================================
 ##           export subset to prelim-maps       ----
 ## ==================================================
-write_csv(psme_rwi, here("~", "..", "..", "capstone", "climatree", "output-data", "step-1-output", "psme_rwi.csv"))
+write_csv(pcma_rwi, here("~", "..", "..", "capstone", "climatree", "output-data", "step-1-output", "pcma_rwi.csv"))
 ```
 
 
