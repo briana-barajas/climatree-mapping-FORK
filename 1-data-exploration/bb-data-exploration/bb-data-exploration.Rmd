@@ -1,0 +1,126 @@
+---
+title: "Exploring Raw Tree Data"
+subtitle: "Isolating 20 Most Sampled Tree Species"
+author: "Briana Barajas"
+date: 2024-01-28
+---
+
+## Preparation
+
+Set-up chunk
+
+```{r}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+Load libraries
+
+```{r}
+library(tidyverse)
+library(here)
+```
+
+## Find 20 Most Sampled Species
+
+### Read Dendro Data
+
+```{r}
+## ==================================================
+##                 read in data                  ----
+## ==================================================
+# read in tree ring data
+rwi_long <- read_csv(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "rwi_long.csv"))
+
+# read in site summary table
+site_smry <- read_table(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "site_summary.tab"))
+
+# read in species metadata
+species_metadata <- read_csv(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "species_metadata.csv"))
+```
+
+### Wrangle and Join Dendro Data
+
+```{r}
+## ==================================================
+##                 prep for join                ----
+## ==================================================
+
+# ...... update species metadata ......
+species_metadata <- species_metadata %>% 
+  rename(sp_code = species_id)
+
+
+# ..... update site smry data .....
+site_smry <- site_smry %>%
+  select(collection_id, sp_id) %>% 
+  mutate(location_id = collection_id) %>%
+  
+  # change sp_id to lower case
+  mutate(sp_code = tolower(sp_id)) %>% 
+  
+  # remove sp_id column
+  select(-sp_id) %>%
+  
+  # remove quotes around strings
+  mutate(collection_id = str_remove_all(collection_id, "\""),
+         sp_code = str_remove_all(sp_code, "\""),
+         location_id = str_remove_all(location_id, "\""))
+
+
+## ==================================================
+##                   join data                   ----
+## ==================================================
+
+# ..... join rwi, metadata, and site summary .....
+rwi_species <- rwi_long %>% 
+  
+  # join rwi to site_summary by collection id
+  left_join(y = site_smry, by = 'collection_id') %>% 
+  
+  #join with species metadata
+  left_join(y = species_metadata, by = "sp_code") #%>%
+```
+
+### Plot Species With Most Tree-Ring Samples
+```{r, plot top spp}
+## ==================================================
+##                  plot 20 top spp              ----
+## ==================================================
+# create df with counts of collection ID
+sp_count <- plyr::count(rwi_species$spp) %>% 
+  rename(spp = x)
+
+# plot top 20 collection ID counts
+sp_count %>% 
+  drop_na(spp) %>% 
+  slice_max(order_by = freq, n = 20) %>% 
+  ggplot() +
+  geom_col(aes(x = fct_reorder(spp, freq), y = freq)) +
+  labs(x = "Genus Species",
+       y = "Number of Samples",
+       title = "20 Most Sampled Species") +
+  geom_text(aes(x = fct_reorder(spp, freq), y = freq,
+                label = freq), hjust = 1.2, color = "white", size = 2.5) +
+  coord_flip() +
+  theme_minimal() 
+```
+
+## Export Subset
+
+```{r psme subset}
+## ==================================================
+##                 create psme subset            ----
+## ==================================================
+# subset most sampled species
+psme_rwi <- rwi_species %>% 
+  filter(spp == "Pseudotsuga menziesii")
+
+## ==================================================
+##           export subset to prelim-maps       ----
+## ==================================================
+write_csv(psme_rwi, here("~", "..", "..", "capstone", "climatree", "output-data", "step-1-output", "psme_rwi.csv"))
+```
+
+
+
+
