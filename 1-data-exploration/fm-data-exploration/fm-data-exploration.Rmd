@@ -1,6 +1,6 @@
 ---
-title: "Title"
-author: "Name"
+title: "Fletcher's Markdown"
+author: "Fletcher McConnell"
 date: 2024-01-28
 ---
 
@@ -10,15 +10,26 @@ Load libraries
 ```{r}
 library(tidyverse)
 library(here)
+library(dplyr)
+library(terra)
+library(sf)
 ```
 
 
 Read in Data
 ```{r}
 # read in tree ring data
-rwi_long <- read_csv(here("~/../../capstone/climatree/dataverse-archive/rwi_long.csv"))
+rwi_long <- read_csv(here("~", "..", "..", "capstone", "climatree", "dataverse-archive", "rwi_long.csv"))
 
-# view tree ring data head
-head(rwi_long, 2)
+# read in site summary table
+site_smry <- read_table(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "site_summary.tab"))
+
+# read in species metadata
+species_metadata <- read_csv(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "species_metadata.csv"))
+```
+
+
+```{r}
+cwd_long <- read_csv(here("~/../../capstone/climatree/dataverse-archive/essentialcwd_data.csv"))
 ```
 
