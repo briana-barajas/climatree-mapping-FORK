@@ -122,7 +122,6 @@ sp_count %>%
   #          ymin = -1, ymax = 731, 
   #          fill = NA, color = "maroon",
   #          linewidth = 1.5)
-
 ```
 
 ## Export Subset
