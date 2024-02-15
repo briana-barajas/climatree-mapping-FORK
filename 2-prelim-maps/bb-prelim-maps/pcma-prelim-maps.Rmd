@@ -1,0 +1,109 @@
+---
+title: "PCMA Preliminary Maps"
+subtitle: "Preliminary maps and spatial analysis for Picea mariana"
+author: "Briana Barajas"
+date: "`r Sys.Date()`"
+---
+
+## Preparation
+
+```{r}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+```{r libs}
+library(tidyverse)
+library(here)
+
+library(sf)     # vector data
+library(terra)  # raster data
+library(tmap)   # mapping
+
+library(tidyr) # additional packages from 4a. First stage.R
+library(dbplyr)
+library(broom.mixed)
+library(broom)
+library(purrr)
+library(fixest)
+library(dtplyr)
+library(furrr)
+```
+
+## Load Data
+
+```{r set-wdir}
+# create tsosie file path
+remote_wdir <- here("~", "..", "..", "capstone", "climatree")
+```
+
+
+```{r read-data}
+## ===========================================
+##          PCMA Dendrochronologies       ----
+## ===========================================
+
+# read in data
+pcma_dendro <- read_csv(here(remote_wdir, "output-data", "step-1-output", "pcma_rwi.csv")) %>% 
+  select(-core_id)
+
+# combine multiple cores from the same tree
+pcma_dendro <- pcma_dendro %>% 
+  lazy_dt() %>% #lazy df only performs computations as requested, decrease comp time
+  
+  group_by(collection_id, tree, year) %>% # grouping to combine multiple cores from same tree
+  
+  summarise(rwi = mean(rwi), .groups = "drop") %>% # calculate mean rwi
+  
+  as_tibble() #convert back to standard df type
+  
+## ===========================================
+##      Historic site-level climate       ----
+## ===========================================
+
+# read in data
+an_site_clim <- read_csv(gzfile(here(remote_wdir, "output-data", "step-1-output", "site_an_clim.gz")))
+
+# join site_clim and dendro data
+pcma_dendro <- pcma_dendro %>% 
+  left_join(an_site_clim, by = c("collection_id", "year"))
+
+## ===========================================
+##            Site information            ----
+## ===========================================
+# read in data
+site_smry <- read_csv(here(remote_wdir, "dataverse-archive", "site_summary.csv"))
+
+# clean colnames
+site_smry <- site_smry %>% 
+  select(collection_id, sp_id) %>% 
+  mutate(species_id = tolower(sp_id)) %>% 
+  select(-sp_id)
+
+# join data
+pcma_dendro <- pcma_dendro %>% 
+  left_join(site_smry, by = "collection_id")
+
+## ===========================================
+##           Drop...            ----
+## ===========================================
+# waiting for update on clim_niche_=.csv
+```
+
+
+```{r explr-data}
+## ==================================================
+##                 PCMA range map                ----
+## ==================================================
+
+# define query for pcma range
+query <- "SELECT * FROM merged_ranges_dissolve WHERE sp_code='pcma' "
+
+# read in pcma geometry data
+pcma_range <- st_read(here(remote_wdir, "dataverse-archive",  "merged_ranges_dissolve.shp"), query = query) %>% 
+  st_make_valid()
+
+# plot pcma range
+tm_shape(pcma_range) +
+  tm_polygons()
+```
+

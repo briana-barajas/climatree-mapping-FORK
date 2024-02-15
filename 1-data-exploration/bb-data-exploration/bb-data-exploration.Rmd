@@ -126,13 +126,13 @@ sp_count %>%
 
 ## Export Subset
 
-```{r psme subset}
+```{r pcma subset}
 ## ==================================================
-##                 create psme subset            ----
+##                 create pcma subset            ----
 ## ==================================================
 # subset most sampled species
 pcma_rwi <- rwi_species %>% 
-  filter(spp == "Pseudotsuga menziesii")
+  filter(spp == "Picea mariana")
 
 ## ==================================================
 ##           export subset to prelim-maps       ----
