@@ -19,6 +19,8 @@ Load libraries
 library(tidyverse)
 library(here)
 library(gghighlight)
+
+remote_wdir <- here("~","..", "..", "capstone", "climatree")
 ```
 
 ## Find 20 Most Sampled Species
@@ -30,13 +32,13 @@ library(gghighlight)
 ##                 read in data                  ----
 ## ==================================================
 # read in tree ring data
-rwi_long <- read_csv(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "rwi_long.csv"))
+rwi_long <- read_csv(here(remote_wdir, "dataverse-archive", "rwi_long.csv"))
 
 # read in site summary table
-site_smry <- read_csv(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "site_summary.csv"))
+site_smry <- read_csv(here(remote_wdir, "dataverse-archive", "site_summary.csv"))
 
 # read in species metadata
-species_metadata <- read_csv(here("~","..", "..", "capstone", "climatree", "dataverse-archive", "species_metadata.csv"))
+species_metadata <- read_csv(here(remote_wdir, "dataverse-archive", "species_metadata.csv"))
 ```
 
 ### Wrangle and Join Dendro Data
@@ -92,7 +94,6 @@ rwi_species <- rwi_clean %>%
 ## ==================================================
 ##                  plot 20 top spp              ----
 ## ==================================================
-
 # ..... create df listing individual trees .....
 indv_tree_spp <- rwi_species %>% 
   group_by(tree) %>% 
@@ -107,12 +108,12 @@ sp_count <- plyr::count(indv_tree_spp$spp) %>%
 # plot top 20 collection ID counts
 sp_count %>% 
   drop_na(spp) %>% 
-  slice_max(order_by = freq, n = 10) %>% 
+  slice_max(order_by = freq, n = 20) %>% 
   ggplot() +
   geom_col(aes(x = fct_reorder(spp, freq), y = freq), fill = "palegreen4") +
   labs(x = "Genus Species",
        y = "Number of Trees Sampled",
-       title = "Prominent Species in Tree Core Dataset") +
+       title = "20 Most Prominent Species in Tree Core Dataset") +
   geom_text(aes(x = fct_reorder(spp, freq), y = freq,
                 label = freq), hjust = 1.2, color = "white", size = 3.5) +
   coord_flip() +
