@@ -124,6 +124,29 @@ sp_count %>%
   #          fill = NA, color = "maroon",
   #          linewidth = 1.5)
 ```
+Customize plot for 
+```{r, eval=FALSE}
+# plot top 20 collection ID counts
+sp_count %>% 
+  drop_na(spp) %>% 
+  slice_max(order_by = freq, n = 10) %>% 
+  ggplot() +
+  geom_col(aes(x = fct_reorder(spp, freq), y = freq), fill = "midnightblue") +
+  labs(x = "Genus Species",
+       y = "Number of Trees Sampled",
+       title = "Top 10 Species") +
+  geom_text(aes(x = fct_reorder(spp, freq), y = freq,
+                label = freq), hjust = 1.2, color = "white", size = 3.5) +
+  coord_flip() +
+  theme_classic() +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust=0.5))
+
+```
+
 
 ## Export Subset
 
