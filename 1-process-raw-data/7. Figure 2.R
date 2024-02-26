@@ -1,389 +1,8 @@
----
-title: "PCMA Preliminary Maps"
-subtitle: "Preliminary maps and spatial analysis for Picea mariana"
-author: "Briana Barajas"
-date: "`r Sys.Date()`"
----
-
-## Preparation
-
-```{r}
-knitr::opts_chunk$set(message = FALSE, warning = FALSE)
-```
-
-```{r libs}
-library(tidyverse)
-library(here)
-
-library(sf)     # vector data
-library(terra)  # raster data
-library(tmap)   # mapping
-
-library(tidyr) # additional packages from 4a. First stage.R
-library(dbplyr)
-library(broom.mixed)
-library(broom)
-library(purrr)
-library(fixest)
-library(dtplyr)
-library(furrr)
-```
-
-## Load Data
-
-```{r set-wdir}
-# create tsosie file path
-remote_wdir <- here("~", "..", "..", "capstone", "climatree")
-```
-
-
-```{r read-data}
-## ===========================================
-##          PCMA Dendrochronologies       ----
-## ===========================================
-
-# read in data
-pcma_dendro <- read_csv(here(remote_wdir, "output-data", "step-1-output", "pcma_rwi.csv")) %>% 
-  select(-core_id)
-
-# combine multiple cores from the same tree
-pcma_dendro <- pcma_dendro %>% 
-  lazy_dt() %>% #lazy df only performs computations as requested, decrease comp time
-  
-  group_by(collection_id, tree, year) %>% # grouping to combine multiple cores from same tree
-  
-  summarise(rwi = mean(rwi), .groups = "drop") %>% # calculate mean rwi
-  
-  as_tibble() #convert back to standard df type
-  
-## ===========================================
-##      Historic site-level climate       ----
-## ===========================================
-
-# read in data
-an_site_clim <- read_csv(gzfile(here(remote_wdir, "output-data", "step-1-output", "site_an_clim.gz")))
-
-# join site_clim and dendro data
-pcma_dendro <- pcma_dendro %>% 
-  left_join(an_site_clim, by = c("collection_id", "year"))
-
-## ===========================================
-##            Site information            ----
-## ===========================================
-# read in data
-site_smry <- read_csv(here(remote_wdir, "dataverse-archive", "site_summary.csv"))
-
-# clean colnames
-site_smry <- site_smry %>% 
-  select(collection_id, sp_id) %>% 
-  mutate(species_id = tolower(sp_id)) %>% 
-  select(-sp_id)
-
-# join data
-pcma_dendro <- pcma_dendro %>% 
-  left_join(site_smry, by = "collection_id")
-
-## ===========================================
-##       Remove spp w.out range maps      ----
-## ===========================================
-# waiting for update on clim_niche_=.csv
-```
-
-
-```{r explr-data, eval=FALSE}
-## ==================================================
-##                 PCMA range map                ----
-## ==================================================
-
-# define query for pcma range
-query <- "SELECT * FROM merged_ranges_dissolve WHERE sp_code='pcma' "
-
-# read in pcma geometry data
-pcma_range <- st_read(here(remote_wdir, "dataverse-archive",  "merged_ranges_dissolve.shp"), query = query) %>% 
-  st_make_valid()
-
-# plot pcma range
-tm_shape(pcma_range) +
-  tm_polygons()
-```
-
-
-```{r, eval=FALSE}
-## ===========================================
-##       Existing site-level regression   ----
-## ===========================================
-# bb - this is site level data, so using the collection_id
-fs_mod <- function(site_data, outcome = "rwi", energy_var = "pet.an", mod_type = "lm"){
-  
-  failed <- F
-  reg_error <- NA
-  nobs <- NA
-  ntrees <- site_data %>% select(tree) %>%  n_distinct()
-  no_cwd_var <- (site_data %>% select(cwd.an) %>% n_distinct() == 1)
-  no_pet_var <- (site_data %>% select(energy_var) %>% n_distinct() == 1)
-
-  if (no_cwd_var | no_pet_var) {
-    message(paste0("Site has no variation in cwd.an or ", energy_var))
-    failed <- T
-  } else{
-    
-    # Try to run felm. Typically fails if missing cwd / pet data
-    # bb - two formula choices, lm or lme
-    tryCatch(
-      expr = {
-        formula <- as.formula(paste0(outcome, " ~ ", energy_var, " + cwd.an")) #bb-define model/formula
-        if (mod_type == "lm"){
-          mod <- lm(formula, data = site_data) ##bb-simple model type
-        }
-        if (mod_type == "lme"){ #bb-ml model type 
-          mod <- nlme::lme(formula,
-                           data=site_data, method="REML",
-                           random = ~ 1 | tree,
-                           correlation = nlme::corAR1(form=~year|tree)) ## bb - controls for autocorrelation
-        }
-        
-        mod_sum <- summary(mod) # bb - specific values from this pulled out in next step
-        mod_vcov <- vcov(mod) # bb - pull out covariance matrix for second stage
-        # cov <- list(int_cwd = mod_vcov[1, 2], 
-        #             int_pet = mod_vcov[1, 3], 
-        #             pet_cwd = mod_vcov[2, 3])
-        nobs <- nobs(mod)
-        mod <- tidy(mod) %>%
-          mutate(term = term %>% str_replace("\\(Intercept\\)", "intercept")) %>% 
-          filter(term %in% c('intercept', 'cwd.an', energy_var)) %>% 
-          pivot_wider(names_from = "term", values_from = c("estimate", "std.error", "statistic", "p.value"))
-        # mod <- mod %>% 
-        #   rename_all(funs(stringr::str_replace_all(., energy_var, 'energy.an')))
-        mod$cov_int_cwd = mod_vcov[c("(Intercept)"), c("cwd.an")]
-        cov_var_name <- paste0("cov_int_", energy_var %>% str_replace(".an", ""))
-        mod[[cov_var_name]] = mod_vcov[c("(Intercept)"), c(energy_var)]
-        cov_var_name <- paste0("cov_cwd_", energy_var %>% str_replace(".an", ""))
-        mod[[cov_var_name]] = mod_vcov[c("cwd.an"), c(energy_var)]
-        mod$r2 = mod_sum$r.squared
-      },
-      error = function(e){ 
-        message("Returned regression error")
-        reg_error <<- e[1]
-        failed <<- T
-      }
-    )    
-  }
-  if (failed){
-    return(NA)
-  }
-  return(tibble(mod = list(mod), nobs = nobs, ntrees = ntrees, error = reg_error))
-}
-
-```
-
-
-
-
-## Run Species niche.R (3b)
-
-```{r, eval=FALSE}
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# Authors: Robert Heilmayr, Frances Moore, Joan Dudney
-# Project: Treeconomics
-# Date: 5/1/20
-# Purpose: 1) Characterize climate niche for different species. 
-#          2) Standardize annual site data, baseline raster, and CMIP predictions for each species
-#
-# Input files:
-#   merged_ranges.shp:
-#   HistoricCWD_AETGrids_Annual.Rdat: Rasters describing historic CWD and AET
-#     Generated using historic_cwdraster.R
-#   monthlycrubaseline_tas:
-#   cmip5_cwdaet_start.Rdat:
-#   cmip5_cwdaet_end.Rdat:
-#   essentialcwd_data.csv:
-#   site_summary.csv:
-# 
-# Output files:
-#   clim_niche.csv: Tabulation of each species' historic climate niche. Parameters used for standardization.
-#   sp_clim_predictions.gz: Dataset describing species' standardized historic climate and their predicted climate under CMIP5 across species' full range
-#   site_ave_clim.gz: Tables describing each site's species-standardized average historic climate
-#   site_an_clim.gz: Tables describing each site's annual species-standardized weather
-# 
-# 
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# Package imports --------------------------------------------------------
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-library(tidyverse)
-library(dbplyr)
-library(RSQLite)
-library(ggplot2)
-library(sf)
-library(rgeos)
-library(stringr)
-library(raster)
-library(readr)
-library(tmap)
-library(tictoc)
-select <- dplyr::select
-
-
-library(furrr)
-n_cores <- 8
-future::plan(multisession, workers = n_cores)
-
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# Load data --------------------------------------------------------------
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# Define path
-data_dir <- "~/../../capstone/climatree/dataverse-archive/"
-output_dir <- "~/../../capstone/climatree/output-data/step-1-output/"
-
-# 1. Historic climate raster
-clim_file <- paste0(data_dir, 'HistoricCWD_AETGrids_Annual.Rdat')
-load(clim_file)
-cwd_historic <- mean(cwd_historic)
-aet_historic <- mean(aet_historic)
-pet_historic <- aet_historic + cwd_historic
-names(cwd_historic) = "cwd"
-names(pet_historic) = "pet"
-
-# 2. Data on historic baseline temp and precip
-temps_historic <- raster(paste0(data_dir, "monthlycrubaseline_tas"))
-names(temps_historic) = "temp"
-temps_historic <- resample(temps_historic, cwd_historic)
-clim_historic <- raster::brick(list(cwd_historic, pet_historic, temps_historic))
-
-# 3. Site-specific historic climate data
-site_clim_csv <- paste0(data_dir, 'essentialcwd_data.csv')
-site_clim_df <- read_csv(site_clim_csv)
-site_clim_df <- site_clim_df %>% 
-  mutate("site_id" = as.character(site)) %>% 
-  rename(location_id = site_id)
-
-# 4. Load species information for sites
-site_smry <- read_csv(paste0(data_dir, 'site_summary.csv'))
-site_smry <- site_smry %>%
-  select(collection_id, sp_id) %>% 
-  mutate(location_id = collection_id) %>% 
-  mutate(sp_code = tolower(sp_id)) %>% 
-  select(-sp_id)
-
-
-## NOTE: FIA data not included in replication data repository
-# site_smry_fia <- read_csv(paste0(wdir, 'out/dendro/site_summary_fia.csv'))
-# site_smry_fia <- site_smry_fia %>% 
-#   select(collection_id, location_id = plot_cn, sp_id = species_id) %>% 
-#   mutate(sp_code = tolower(sp_id)) %>% 
-#   select(-sp_id)
-# site_smry <- rbind(site_smry, site_smry_fia)
-
-
-# 5. Species range maps
-range_file <- paste0(data_dir, 'merged_ranges_dissolve.shp')
-range_sf <- st_read(range_file)
-
-# 6. Climate projections from CMIP5
-cmip_end <- load(paste0(data_dir, 'cmip5_cwdaet_end.Rdat'))
-pet_cmip_end <- aet_raster + cwd_raster
-cwd_cmip_end <- cwd_raster
-names(cwd_cmip_end) <- NULL # Resetting this due to strange names in file from CMIP processing
-rm(cwd_raster)
-rm(aet_raster)
-
-cmip_start <- load(paste0(data_dir, 'cmip5_cwdaet_start.Rdat'))
-pet_cmip_start <- aet_raster + cwd_raster
-cwd_cmip_start <- cwd_raster
-names(cwd_cmip_start) <- NULL # Resetting this due to strange names in file from CMIP processing
-rm(cwd_raster)
-rm(aet_raster)
-
-
-# #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# # Visually inspect data -----------------------------------------------
-# #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# tmap_mode("view")
-# tm_shape(cwd_cmip_end) +
-#   tm_raster() +
-#   tm_facets(as.layers = TRUE)
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# Summarize species niches -----------------------------------------------
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# Pull and organize climate distribution for species
-pull_clim <- function(spp_code){
-  print(spp_code)
-  # Pull relevant range map
-  sp_range <- range_sf %>%
-    filter(sp_code == spp_code) %>% 
-    rasterize(cwd_historic, getCover=TRUE)
-  sp_range[sp_range==0] <- NA
-  
-  # Pull cwd and aet values
-  cwd_vals <- cwd_historic %>% 
-    mask(sp_range) %>% 
-    as.data.frame(xy = TRUE) %>% 
-    drop_na()
-  
-  pet_vals <- pet_historic %>% 
-    mask(sp_range) %>% 
-    as.data.frame(xy = TRUE) %>% 
-    drop_na()
-  
-  temp_vals <- temps_historic %>% 
-    mask(sp_range) %>% 
-    as.data.frame(xy = TRUE) %>% 
-    drop_na()
-  
-  # Combine into tibble
-  clim_vals <- cwd_vals %>% 
-    left_join(pet_vals, by = c("x", "y")) %>% 
-    left_join(temp_vals, by = c("x", "y"))
-  
-  return(clim_vals)
-}
-
-species_list <- range_sf %>%
-  pull(sp_code) %>%
-  unique() %>%
-  enframe(name = NULL) %>%
-  select(sp_code = value) %>%
-  arrange(sp_code) %>%
-  drop_na()
-
-# NOTE: future_map takes ~15 minutes to run
-
-# clim_df <- species_list %>% 
-#   mutate(clim_vals = future_map(sp_code, 
-#                                 .f = pull_clim,
-#                                 .options = furrr_options(packages = c( "dplyr", "raster", "sf")),
-#                                 .progress = TRUE))
-
-
-## Summarize mean and sd of each species' climate
-niche_df <- clim_df %>% 
-  unnest(clim_vals) %>% 
-  group_by(sp_code) %>% 
-  summarize(pet_mean = mean(pet),
-            pet_sd = sd(pet),
-            cwd_mean = mean(cwd),
-            cwd_sd = sd(cwd),
-            temp_mean = mean(temp),
-            temp_sd = sd(temp))
-
-
-## Export species niche description
-write.csv(niche_df, paste0(output_dir, "clim_niche.csv"))
-```
-
-
-## Re-Create Figure 2
-
-```{r, eval=FALSE}
 #===============================================================================
 # Species deep dive plots
 # 
 # 
 #===============================================================================
-
 
 #===============================================================================
 # 1) Pkg imports ---------
@@ -403,7 +22,6 @@ library(viridis)
 library(patchwork)
 library(effects)
 library(dplR)
-
 select <- dplyr::select
 
 
@@ -423,8 +41,8 @@ pt_size = .pt
 # 2) Data imports  ---------
 #===============================================================================
 ### Define path
-data_dir <- "~/../../capstone/climatree/dataverse-archive/"
-output_dir <- "~/../../capstone/climatree/output-data/step-1-output/"
+data_dir <- "~/../../capstone/climatree/raw_data/"
+output_dir <- "~/../../capstone/climatree/output/1-process-raw-data/"
 
 # 1. Site-level regressions
 flm_df <- read_csv(paste0(output_dir, "site_pet_cwd_std_augmented.csv")) 
@@ -451,17 +69,12 @@ site_smry <- site_smry %>%
 # site_smry <- site_smry %>% 
 #   left_join(sp_info, by = c("species_id"))
 
-## .....................cant run 5-6.....................................
-
 # 5. Prediction rasters
-rwi_list <- list.files(paste0(wdir, "2_output/predictions/sp_rwi/"), pattern = ".gz", full.names = TRUE)
+rwi_list <- list.files(paste0(output_dir, "sp_rwi/"), pattern = ".gz", full.names = TRUE)
 sp_predictions <- do.call('rbind', lapply(rwi_list, readRDS))
 
 # 6. Dendro examples - note: exporting two pipo sites in first stage script
-dendro_ex <- read_csv(paste0(data_dir, "2_output/first_stage/example_sites.csv"))
-
-## ......................................................................
-
+dendro_ex <- read_csv(paste0(output_dir, "example_sites.csv"))
 
 # 7. Raw dendro file for one site
 rwl_path <- paste0(data_dir, "ca585.rwl")
@@ -475,14 +88,14 @@ rwl_dat <- read.tucson(paste0(rwl_path))
 # Define species
 flm_df %>% group_by(species_id) %>% tally() %>% arrange(desc(n))
 
-spp_code <- 'pila'
+spp_code <- 'pisy'
 
 
 trim_df <- flm_df %>% 
   filter(species_id == spp_code)
 
-# spp_predictions <- sp_predictions %>% 
-#   filter(sp_code == spp_code)
+spp_predictions <- sp_predictions %>% 
+  filter(sp_code == spp_code)
 
 # sp_fut <- (spp_predictions %>% 
 #              pull(clim_future_sp))[[1]]
@@ -658,9 +271,9 @@ hex <- spp_predictions %>%
   coord_fixed() +
   guides(fill=F, colour=F)+
   geom_point(data = trim_df, aes(x = cwd.spstd, y = pet.spstd), colour = '#B0357B', alpha = 0.4, size = 0.75) +
-  geom_point(aes(x = high_fs$cwd.spstd, y = high_fs$pet.spstd), color = high_color, size = 3) +
-  geom_point(aes(x = low_fs$cwd.spstd, y = low_fs$pet.spstd), color = low_color, size = 3) +
-  geom_segment(
+  geom_point(data = high_fs, aes(x = high_fs$cwd.spstd, y = high_fs$pet.spstd), color = high_color, size = 3) +
+  geom_point(data = low_fs, aes(x = cwd.spstd, y = pet.spstd), color = low_color, size = 3) +
+  geom_segment(data = high_fs, 
     x = 0.5, y = -1.3,
     xend = high_fs$cwd.spstd + 0.2, yend = high_fs$pet.spstd - 0.04,
     lineend = "round",
@@ -868,5 +481,4 @@ rwi_map <- ggplot() +
 rwi_map
 
 ggsave(paste0(wdir, '3_results/figures/methods_panels/step_6b.png'), plot = rwi_map, bg= 'transparent', width = 2.25, height = 2.9, dpi = 600)
-```
 

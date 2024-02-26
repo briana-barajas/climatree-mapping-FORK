@@ -1,0 +1,1920 @@
+---
+title: "PCMA Preliminary Maps"
+subtitle: "Preliminary maps and spatial analysis for Picea mariana"
+author: "Briana Barajas"
+date: "`r Sys.Date()`"
+---
+
+## Preparation
+
+```{r}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+```{r libs}
+library(tidyverse)
+library(here)
+
+library(sf)     # vector data
+library(terra)  # raster data
+library(tmap)   # mapping
+
+library(tidyr) # additional packages from 4a. First stage.R
+library(dbplyr)
+library(broom.mixed)
+library(broom)
+library(purrr)
+library(fixest)
+library(dtplyr)
+library(furrr)
+```
+
+## Load Data
+
+```{r set-wdir}
+# create tsosie file path
+remote_wdir <- here("~", "..", "..", "capstone", "climatree")
+```
+
+
+```{r read-data}
+## ===========================================
+##          PCMA Dendrochronologies       ----
+## ===========================================
+
+# read in data
+pcma_dendro <- read_csv(here(remote_wdir, "output-data", "step-1-output", "pcma_rwi.csv")) %>% 
+  select(-core_id)
+
+# combine multiple cores from the same tree
+pcma_dendro <- pcma_dendro %>% 
+  lazy_dt() %>% #lazy df only performs computations as requested, decrease comp time
+  
+  group_by(collection_id, tree, year) %>% # grouping to combine multiple cores from same tree
+  
+  summarise(rwi = mean(rwi), .groups = "drop") %>% # calculate mean rwi
+  
+  as_tibble() #convert back to standard df type
+  
+## ===========================================
+##      Historic site-level climate       ----
+## ===========================================
+
+# read in data
+an_site_clim <- read_csv(gzfile(here(remote_wdir, "output-data", "step-1-output", "site_an_clim.gz")))
+
+# join site_clim and dendro data
+pcma_dendro <- pcma_dendro %>% 
+  left_join(an_site_clim, by = c("collection_id", "year"))
+
+## ===========================================
+##            Site information            ----
+## ===========================================
+# read in data
+site_smry <- read_csv(here(remote_wdir, "dataverse-archive", "site_summary.csv"))
+
+# clean colnames
+site_smry <- site_smry %>% 
+  select(collection_id, sp_id) %>% 
+  mutate(species_id = tolower(sp_id)) %>% 
+  select(-sp_id)
+
+# join data
+pcma_dendro <- pcma_dendro %>% 
+  left_join(site_smry, by = "collection_id")
+
+## ===========================================
+##       Remove spp w.out range maps      ----
+## ===========================================
+# waiting for update on clim_niche_=.csv
+```
+
+
+```{r explr-data, eval=FALSE}
+## ==================================================
+##                 PCMA range map                ----
+## ==================================================
+
+# define query for pcma range
+query <- "SELECT * FROM merged_ranges_dissolve WHERE sp_code='pcma' "
+
+# read in pcma geometry data
+pcma_range <- st_read(here(remote_wdir, "dataverse-archive",  "merged_ranges_dissolve.shp"), query = query) %>% 
+  st_make_valid()
+
+# plot pcma range
+tm_shape(pcma_range) +
+  tm_polygons()
+```
+
+
+```{r, eval=FALSE}
+## ===========================================
+##       Existing site-level regression   ----
+## ===========================================
+# bb - this is site level data, so using the collection_id
+fs_mod <- function(site_data, outcome = "rwi", energy_var = "pet.an", mod_type = "lm"){
+  
+  failed <- F
+  reg_error <- NA
+  nobs <- NA
+  ntrees <- site_data %>% select(tree) %>%  n_distinct()
+  no_cwd_var <- (site_data %>% select(cwd.an) %>% n_distinct() == 1)
+  no_pet_var <- (site_data %>% select(energy_var) %>% n_distinct() == 1)
+
+  if (no_cwd_var | no_pet_var) {
+    message(paste0("Site has no variation in cwd.an or ", energy_var))
+    failed <- T
+  } else{
+    
+    # Try to run felm. Typically fails if missing cwd / pet data
+    # bb - two formula choices, lm or lme
+    tryCatch(
+      expr = {
+        formula <- as.formula(paste0(outcome, " ~ ", energy_var, " + cwd.an")) #bb-define model/formula
+        if (mod_type == "lm"){
+          mod <- lm(formula, data = site_data) ##bb-simple model type
+        }
+        if (mod_type == "lme"){ #bb-ml model type 
+          mod <- nlme::lme(formula,
+                           data=site_data, method="REML",
+                           random = ~ 1 | tree,
+                           correlation = nlme::corAR1(form=~year|tree)) ## bb - controls for autocorrelation
+        }
+        
+        mod_sum <- summary(mod) # bb - specific values from this pulled out in next step
+        mod_vcov <- vcov(mod) # bb - pull out covariance matrix for second stage
+        # cov <- list(int_cwd = mod_vcov[1, 2], 
+        #             int_pet = mod_vcov[1, 3], 
+        #             pet_cwd = mod_vcov[2, 3])
+        nobs <- nobs(mod)
+        mod <- tidy(mod) %>%
+          mutate(term = term %>% str_replace("\\(Intercept\\)", "intercept")) %>% 
+          filter(term %in% c('intercept', 'cwd.an', energy_var)) %>% 
+          pivot_wider(names_from = "term", values_from = c("estimate", "std.error", "statistic", "p.value"))
+        # mod <- mod %>% 
+        #   rename_all(funs(stringr::str_replace_all(., energy_var, 'energy.an')))
+        mod$cov_int_cwd = mod_vcov[c("(Intercept)"), c("cwd.an")]
+        cov_var_name <- paste0("cov_int_", energy_var %>% str_replace(".an", ""))
+        mod[[cov_var_name]] = mod_vcov[c("(Intercept)"), c(energy_var)]
+        cov_var_name <- paste0("cov_cwd_", energy_var %>% str_replace(".an", ""))
+        mod[[cov_var_name]] = mod_vcov[c("cwd.an"), c(energy_var)]
+        mod$r2 = mod_sum$r.squared
+      },
+      error = function(e){ 
+        message("Returned regression error")
+        reg_error <<- e[1]
+        failed <<- T
+      }
+    )    
+  }
+  if (failed){
+    return(NA)
+  }
+  return(tibble(mod = list(mod), nobs = nobs, ntrees = ntrees, error = reg_error))
+}
+
+```
+
+
+
+
+## Run Species niche.R (3b)
+
+```{r, eval=FALSE}
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Authors: Robert Heilmayr, Frances Moore, Joan Dudney
+# Project: Treeconomics
+# Date: 5/1/20
+# Purpose: 1) Characterize climate niche for different species. 
+#          2) Standardize annual site data, baseline raster, and CMIP predictions for each species
+#
+# Input files:
+#   merged_ranges.shp:
+#   HistoricCWD_AETGrids_Annual.Rdat: Rasters describing historic CWD and AET
+#     Generated using historic_cwdraster.R
+#   monthlycrubaseline_tas:
+#   cmip5_cwdaet_start.Rdat:
+#   cmip5_cwdaet_end.Rdat:
+#   essentialcwd_data.csv:
+#   site_summary.csv:
+# 
+# Output files:
+#   clim_niche.csv: Tabulation of each species' historic climate niche. Parameters used for standardization.
+#   sp_clim_predictions.gz: Dataset describing species' standardized historic climate and their predicted climate under CMIP5 across species' full range
+#   site_ave_clim.gz: Tables describing each site's species-standardized average historic climate
+#   site_an_clim.gz: Tables describing each site's annual species-standardized weather
+# 
+# 
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Package imports --------------------------------------------------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+library(tidyverse)
+library(dbplyr)
+library(RSQLite)
+library(ggplot2)
+library(sf)
+library(rgeos)
+library(stringr)
+library(raster)
+library(readr)
+library(tmap)
+library(tictoc)
+select <- dplyr::select
+
+
+library(furrr)
+n_cores <- 8
+future::plan(multisession, workers = n_cores)
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Load data --------------------------------------------------------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Define path
+data_dir <- "~/../../capstone/climatree/dataverse-archive/"
+output_dir <- "~/../../capstone/climatree/output-data/step-1-output/"
+
+# 1. Historic climate raster
+clim_file <- paste0(data_dir, 'HistoricCWD_AETGrids_Annual.Rdat')
+load(clim_file)
+cwd_historic <- mean(cwd_historic)
+aet_historic <- mean(aet_historic)
+pet_historic <- aet_historic + cwd_historic
+names(cwd_historic) = "cwd"
+names(pet_historic) = "pet"
+
+# 2. Data on historic baseline temp and precip
+temps_historic <- raster(paste0(data_dir, "monthlycrubaseline_tas"))
+names(temps_historic) = "temp"
+temps_historic <- resample(temps_historic, cwd_historic)
+clim_historic <- raster::brick(list(cwd_historic, pet_historic, temps_historic))
+
+# 3. Site-specific historic climate data
+site_clim_csv <- paste0(data_dir, 'essentialcwd_data.csv')
+site_clim_df <- read_csv(site_clim_csv)
+site_clim_df <- site_clim_df %>% 
+  mutate("site_id" = as.character(site)) %>% 
+  rename(location_id = site_id)
+
+# 4. Load species information for sites
+site_smry <- read_csv(paste0(data_dir, 'site_summary.csv'))
+site_smry <- site_smry %>%
+  select(collection_id, sp_id) %>% 
+  mutate(location_id = collection_id) %>% 
+  mutate(sp_code = tolower(sp_id)) %>% 
+  select(-sp_id)
+
+
+## NOTE: FIA data not included in replication data repository
+# site_smry_fia <- read_csv(paste0(wdir, 'out/dendro/site_summary_fia.csv'))
+# site_smry_fia <- site_smry_fia %>% 
+#   select(collection_id, location_id = plot_cn, sp_id = species_id) %>% 
+#   mutate(sp_code = tolower(sp_id)) %>% 
+#   select(-sp_id)
+# site_smry <- rbind(site_smry, site_smry_fia)
+
+
+# 5. Species range maps
+range_file <- paste0(data_dir, 'merged_ranges_dissolve.shp')
+range_sf <- st_read(range_file)
+
+# 6. Climate projections from CMIP5
+cmip_end <- load(paste0(data_dir, 'cmip5_cwdaet_end.Rdat'))
+pet_cmip_end <- aet_raster + cwd_raster
+cwd_cmip_end <- cwd_raster
+names(cwd_cmip_end) <- NULL # Resetting this due to strange names in file from CMIP processing
+rm(cwd_raster)
+rm(aet_raster)
+
+cmip_start <- load(paste0(data_dir, 'cmip5_cwdaet_start.Rdat'))
+pet_cmip_start <- aet_raster + cwd_raster
+cwd_cmip_start <- cwd_raster
+names(cwd_cmip_start) <- NULL # Resetting this due to strange names in file from CMIP processing
+rm(cwd_raster)
+rm(aet_raster)
+
+
+# #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# # Visually inspect data -----------------------------------------------
+# #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# tmap_mode("view")
+# tm_shape(cwd_cmip_end) +
+#   tm_raster() +
+#   tm_facets(as.layers = TRUE)
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Summarize species niches -----------------------------------------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Pull and organize climate distribution for species
+pull_clim <- function(spp_code){
+  print(spp_code)
+  # Pull relevant range map
+  sp_range <- range_sf %>%
+    filter(sp_code == spp_code) %>% 
+    rasterize(cwd_historic, getCover=TRUE)
+  sp_range[sp_range==0] <- NA
+  
+  # Pull cwd and aet values
+  cwd_vals <- cwd_historic %>% 
+    mask(sp_range) %>% 
+    as.data.frame(xy = TRUE) %>% 
+    drop_na()
+  
+  pet_vals <- pet_historic %>% 
+    mask(sp_range) %>% 
+    as.data.frame(xy = TRUE) %>% 
+    drop_na()
+  
+  temp_vals <- temps_historic %>% 
+    mask(sp_range) %>% 
+    as.data.frame(xy = TRUE) %>% 
+    drop_na()
+  
+  # Combine into tibble
+  clim_vals <- cwd_vals %>% 
+    left_join(pet_vals, by = c("x", "y")) %>% 
+    left_join(temp_vals, by = c("x", "y"))
+  
+  return(clim_vals)
+}
+
+species_list <- range_sf %>%
+  pull(sp_code) %>%
+  unique() %>%
+  enframe(name = NULL) %>%
+  select(sp_code = value) %>%
+  arrange(sp_code) %>%
+  drop_na()
+
+# NOTE: future_map takes ~15 minutes to run
+
+# clim_df <- species_list %>% 
+#   mutate(clim_vals = future_map(sp_code, 
+#                                 .f = pull_clim,
+#                                 .options = furrr_options(packages = c( "dplyr", "raster", "sf")),
+#                                 .progress = TRUE))
+
+
+## Summarize mean and sd of each species' climate
+niche_df <- clim_df %>% 
+  unnest(clim_vals) %>% 
+  group_by(sp_code) %>% 
+  summarize(pet_mean = mean(pet),
+            pet_sd = sd(pet),
+            cwd_mean = mean(cwd),
+            cwd_sd = sd(cwd),
+            temp_mean = mean(temp),
+            temp_sd = sd(temp))
+
+
+## Export species niche description
+write.csv(niche_df, paste0(output_dir, "clim_niche.csv"))
+
+
+```
+
+## Run 5a
+```{r}
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Authors: Robert Heilmayr, Joan Dudney, Frances Moore
+# Project: Treeconomics
+# Date: 5/17/20
+# Purpose: Run regressions to explore impact of historical climate on weather sensitivity
+#
+# Input files:
+# - site_pet_cwd_std.csv: Table of first stage regression parameters for baseline specification. Generated in "4a. First stage.R"
+# - site_ave_clim.gz: Site-level climate parameters. Generated using "3b. Species_niche.R"
+# - site_summary.csv: Summary data about each site. Generated using "1b. Parse ITRDB.R"
+# - species_gen_gr.csv: Lookup key for angiosperm / gymnosperm differentiation
+# 
+# Output files:
+# - site_pet_cwd_std_augmented.csv: Intermediate file to enable downstream identification of outlier assignment.
+# - mc_sample.gz: Intermediate file of all bootstrapped samples.
+# - ss_bootstrap.rds: Final second stage model parameters for each of n_mc Monte Carlo runs.
+#
+#
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Package imports --------------------------------------------------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+library(MASS)
+library(tidyverse)
+library(broom)
+library(purrr)
+library(margins)
+library(tidylog)
+library(fixest)
+library(gstat)
+library(sf)
+library(units)
+library(dtplyr)
+library(marginaleffects)
+
+set.seed(5597)
+
+select <- dplyr::select
+
+n_mc <- 10000
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Import data --------------------------------------------------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+### Define path
+data_dir <- "~/../../capstone/climatree/dataverse-archive/"
+output_dir <- "~/../../capstone/climatree/output-data/step-1-output/"
+
+# 1. Site-level regressions
+flm_df <- read_csv(paste0(output_dir, '/site_pet_cwd_std.csv'))
+
+# 2. Historic site-level climate
+ave_site_clim <- read_csv(gzfile(paste0(output_dir, "site_ave_clim.gz")))
+
+flm_df <- flm_df %>% 
+  left_join(ave_site_clim, by = c("collection_id"))
+
+# 3. Site information
+site_df <- read_csv(paste0(wdir, '1_input_processed/dendro/site_summary.csv'))
+site_df <- site_df %>% 
+  select(collection_id, sp_id, latitude, longitude)
+site_df <- site_df %>% 
+  rename(species_id = sp_id) %>% 
+  mutate(species_id = str_to_lower(species_id))
+
+# # 4. Species information
+# sp_info <- read_csv(paste0(wdir, 'species_gen_gr.csv'))
+# sp_info <- sp_info %>% 
+#   select(species_id, genus, gymno_angio, family)
+# site_df <- site_df %>% 
+#   left_join(sp_info, by = "species_id")
+
+# Merge back into main flm_df
+flm_df <- flm_df %>% 
+  left_join(site_df, by = "collection_id")
+
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Prep and trim data -----------------------------------------------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Add weighting based on inverse of first stage variance
+flm_df <- flm_df %>% 
+  mutate(cwd_errorweights = 1 / (std.error_cwd.an),
+         errorweights2 = sqrt(ntrees),
+         pet_errorweights = 1 / (std.error_pet.an),
+         int_errorweights = 1 / (std.error_intercept))
+
+# Identify and trim extreme outliers
+cwd_est_bounds = quantile(flm_df$estimate_cwd.an, c(0.01, 0.99),na.rm=T)
+pet_est_bounds = quantile(flm_df$estimate_pet.an, c(0.01, 0.99),na.rm=T)
+cwd_spstd_bounds = quantile(flm_df$cwd.spstd, c(0.01, 0.99), na.rm = T)
+pet_spstd_bounds = quantile(flm_df$pet.spstd, c(0.01, 0.99), na.rm = T)
+
+# flm_df <- flm_df %>%
+#   mutate(outlier = (estimate_cwd.an<cwd_est_bounds[1]) |
+#            (estimate_cwd.an>cwd_est_bounds[2]) |
+#            (estimate_pet.an<pet_est_bounds[1]) |
+#            (estimate_pet.an>pet_est_bounds[2]) |
+#            (cwd.spstd<cwd_spstd_bounds[1]) |
+#            (cwd.spstd>cwd_spstd_bounds[2]) |
+#            (pet.spstd<pet_spstd_bounds[1]) |
+#            (pet.spstd>pet_spstd_bounds[2]))
+           
+
+flm_df <- flm_df %>%
+  mutate(outlier = (estimate_cwd.an<cwd_est_bounds[1]) |
+                   (estimate_cwd.an>cwd_est_bounds[2]) |
+                   (estimate_pet.an<pet_est_bounds[1]) |
+                   (estimate_pet.an>pet_est_bounds[2]))
+
+# Save out full flm_df to simplify downstream scripts and ensure consistency
+flm_df %>% write.csv(paste0(wdir, "2_output/first_stage/site_pet_cwd_std_augmented.csv"))
+
+# Trim outliers
+trim_df <- flm_df %>% 
+  filter(outlier==0) %>% 
+  drop_na()
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Spatial autocorrelation of trim_df ---------------------------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+site_points=st_as_sf(trim_df,coords=c("longitude","latitude"),crs="+init=epsg:4326 +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0")
+
+vg <-variogram(estimate_cwd.an~1, site_points, cutoff = 1500, width = 10)
+vg.fit <- fit.variogram(vg, model = vgm(1, "Sph", 900, 1))
+plot(vg, vg.fit)
+# print(paste0("Range before hitting sill (km): "), as.character(vg.fit[2,3]))
+
+vg.range = vg.fit[2,3] * 1000
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Quick test of primary regression ---------------------------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+formula = as.formula("estimate_cwd.an ~ cwd.spstd + (cwd.spstd^2) + pet.spstd + (pet.spstd^2)")
+mod_data <- trim_df
+cwd_mod <- feols(formula, data = mod_data, weights = mod_data$cwd_errorweights,
+             vcov = conley(cutoff = vg.range/1000, distance = "spherical"))
+summary(cwd_mod)
+
+marg_fx_df <- function(mod){
+  inc <- 0.1
+  min <- -2.5
+  max <- 2.5
+  cwd_pred <- predictions(mod, newdata = datagrid(pet.spstd = 0, cwd.spstd = seq(min,max,inc))) %>% 
+    mutate(variation = "cwd")
+  pet_pred <- predictions(mod, newdata = datagrid(pet.spstd = seq(min,max,inc), cwd.spstd = 0)) %>% 
+    mutate(variation = "pet")
+  return(rbind(cwd_pred, pet_pred))
+}
+
+
+preds <- marg_fx_df(cwd_mod)
+
+cwd_mfx_plot <- preds %>% 
+  filter(variation == "cwd") %>% 
+  ggplot(aes(x = cwd.spstd)) + 
+  geom_line(aes(y = estimate)) +
+  geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
+cwd_mfx_plot
+
+pet_mfx_plot <- preds %>% 
+  filter(variation == "pet") %>% 
+  ggplot(aes(x = pet.spstd)) + 
+  geom_line(aes(y = estimate)) +
+  geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
+pet_mfx_plot
+
+formula = as.formula("estimate_pet.an ~ cwd.spstd + pet.spstd + (cwd.spstd^2) + (pet.spstd^2)")
+pet_mod <- feols(formula, weights = mod_data$pet_errorweights, data = mod_data,
+                 vcov = conley(cutoff = vg.range/1000, distance = "spherical"))
+summary(pet_mod)
+preds <- marg_fx_df(pet_mod)
+
+cwd_mfx_plot <- preds %>% 
+  filter(variation == "cwd") %>% 
+  ggplot(aes(x = cwd.spstd)) + 
+  geom_line(aes(y = estimate)) +
+  geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
+cwd_mfx_plot
+
+pet_mfx_plot <- preds %>% 
+  filter(variation == "pet") %>% 
+  ggplot(aes(x = pet.spstd)) + 
+  geom_line(aes(y = estimate)) +
+  geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
+pet_mfx_plot
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Identify spatially proximate blocks of sites ---------------------------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+site_list <- trim_df %>%
+  pull(collection_id) %>%
+  unique()
+n_sites <- length(site_list)
+
+site_dist=st_distance(site_points)
+rownames(site_dist)=site_points$collection_id
+colnames(site_dist)=site_points$collection_id
+# save(site_dist,file=paste0(wdir,"out/site_distances.Rdat"))
+# load(paste0(wdir,"out/site_distances.Rdat"))
+
+dist_df <- as_tibble(site_dist) %>% 
+  drop_units() 
+
+dist_df <- dist_df %>%
+  lazy_dt() %>% 
+  mutate(collection_id = names(dist_df)) %>% 
+  # select(collection_id, site_list) %>% 
+  # filter(collection_id %in% site_list) %>% 
+  mutate(across(.cols = !collection_id, ~(.x < vg.range))) %>% 
+  # mutate(across(.cols = !collection_id, ~ifelse((.x < range), collection_id, "DROP"))) %>% 
+  as_tibble()
+
+block_list <- c()
+for (site in site_list){
+  block_sites <- dist_df %>% 
+    filter(get(site) == TRUE) %>% 
+    pull(collection_id)
+  block_list[site] <- list(block_sites)
+}
+save(block_list,file=paste0(wdir,"2_output/second_stage/spatial_blocks.Rdat"))
+# load(file=paste0(wdir,"out/second_stage/spatial_blocks.Rdat"))
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Create block bootstrap draws  ---------------------------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+draw_blocks <- function(site_sample){
+  samp <- site_sample %>% pull(samp)
+  blocked_draw <- (block_list[samp] %>% unlist() %>% unname())[1:n_sites]
+  return(blocked_draw)  
+}
+
+n_obs = n_mc * n_sites
+block_draw_df <- tibble(boot_id = rep(1:n_mc, each = n_sites)) %>% 
+  lazy_dt() %>% 
+  mutate(samp = sample(site_list,size=n_obs,replace=TRUE)) %>%
+  group_by(boot_id) %>% 
+  nest()
+
+block_draw_df <- block_draw_df %>% 
+  mutate(sites = map(.x = data, .f = draw_blocks)) %>% # COULD PARALLELIZE HERE?
+  select(boot_id, sites) %>% 
+  as_tibble() %>% 
+  unnest(sites) 
+
+block_draw_df <- block_draw_df %>% 
+  rename(collection_id = sites)
+
+## Identify number of draws needed for each site
+n_draws <- block_draw_df %>% 
+  group_by(collection_id) %>% 
+  tally() %>% 
+  rename(n_draw = n)
+
+trim_df <- trim_df %>% 
+  left_join(n_draws, by = "collection_id")
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Random draws of coefs from first stage ---------------------------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+## Function to create random draws of first stage coefficients
+draw_coefs <- function(n, cwd_est, pet_est, int_est, cwd_ste, pet_ste, int_ste, 
+                       cwd_pet_cov, pet_int_cov, cwd_int_cov){
+  mu <- c("cwd_coef" = cwd_est, 
+          "pet_coef" = pet_est, 
+          "int_coef" = int_est)
+  vcov <- matrix(data = NA, nrow = 3, ncol = 3)
+  vcov[1,1] <- cwd_ste^2
+  vcov[2,2] <- pet_ste^2
+  vcov[3,3] <- int_ste^2
+  vcov[1,2] <- cwd_pet_cov
+  vcov[2,1] <- cwd_pet_cov
+  vcov[1,3] <- cwd_int_cov
+  vcov[3,1] <- cwd_int_cov
+  vcov[2,3] <- pet_int_cov
+  vcov[3,2] <- pet_int_cov
+  
+  draw <- mvrnorm(n, mu, vcov)
+  draw <- as_tibble(draw)
+  draw$iter_idx <- seq(1,n)
+  draw <- draw %>% select(iter_idx, cwd_coef, pet_coef, int_coef)
+  return(draw)
+}
+
+## Create needed number (n_draw) of random draws of first stage coefficients for each site
+trim_df <- trim_df %>% 
+  drop_na()
+
+mc_df <- trim_df %>%
+  mutate(coef_draws = pmap(list(n = trim_df$n_draw + 1, 
+                                cwd_est = trim_df$estimate_cwd.an, 
+                                pet_est = trim_df$estimate_pet.an,
+                                int_est = trim_df$estimate_intercept, 
+                                cwd_ste = trim_df$std.error_cwd.an,
+                                pet_ste = trim_df$std.error_pet.an, 
+                                int_ste = trim_df$std.error_intercept,
+                                cwd_pet_cov = trim_df$cov_cwd_pet, 
+                                cwd_int_cov = trim_df$cov_int_cwd,
+                                pet_int_cov = trim_df$cov_int_pet), 
+                           draw_coefs))
+
+
+## Unnest to create dataframe of n_site X n_draw coefficient estimates
+mc_df <- mc_df %>% 
+  unnest(coef_draws) %>% 
+  select(collection_id, iter_idx, cwd_coef, pet_coef, int_coef, cwd.spstd, 
+         pet.spstd, latitude, longitude, cwd_errorweights, pet_errorweights, int_errorweights)
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Merge first stage draws back to bootstrap dataframe -------------------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+block_draw_df <- block_draw_df %>% 
+  group_by(collection_id) %>% 
+  mutate(iter_idx = 1:n())
+
+block_draw_df <- block_draw_df %>% 
+  left_join(mc_df, by = c("collection_id", "iter_idx"))
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Export first stage draws to pull summary stats -------------------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+block_draw_df %>% 
+  # select(boot_id, collection_id, cwd_coef, pet_coef, int_coef, cwd.spstd, pet.spstd) %>% 
+  write_rds(paste0(wdir, "2_output/second_stage/mc_sample.gz"), compress = "gz")
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Run bootstrap estimation of second stage model -------------------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+## Function defining main second stage model
+run_ss <- function(data, outcome = "cwd_coef"){
+  if (outcome == "cwd_coef") {
+    error_weights = data$cwd_errorweights
+  } else if (outcome == "pet_coef") {
+    error_weights = data$pet_errorweights
+  } else if (outcome == "int_coef") {
+    error_weights = data$int_errorweights
+  }
+  formula <- as.formula(paste(outcome, " ~ cwd.spstd + I(cwd.spstd^2) + pet.spstd + I(pet.spstd^2)"))
+  mod <- lm(formula, data=data, weights = error_weights)
+  # mod <- lm(formula, data=data)
+  coefs <- mod %>% 
+    tidy() %>% 
+    pull(estimate) 
+  return(coefs)
+}
+
+
+## Function to run second stage model for first stage CWD, 
+## PET and Intercept terms and organize coefficients
+bs_ss <- function(data){
+  # data <- data %>% # Needed to add this since block bootstrap is returning nested tibble
+  #   unnest(cols = c(data))
+  cwd_mod <- data %>% 
+    run_ss(outcome = "cwd_coef")
+  pet_mod <- data %>% 
+    run_ss(outcome = "pet_coef")
+  int_mod <- data %>% 
+    run_ss(outcome = "int_coef")
+  # return(list("int_mod" = c(int_mod),
+  #             "cwd_mod" = c(cwd_mod),
+  #             "pet_mot" = c(pet_mod)))
+  return(list(int_int = int_mod[1],
+              int_cwd = int_mod[2],
+              int_cwd2 = int_mod[3],
+              int_pet = int_mod[4],
+              int_pet2 = int_mod[5],
+              cwd_int = cwd_mod[1],
+              cwd_cwd = cwd_mod[2],
+              cwd_cwd2 = cwd_mod[3],
+              cwd_pet = cwd_mod[4],
+              cwd_pet2 = cwd_mod[5],
+              pet_int = pet_mod[1],
+              pet_cwd = pet_mod[2],
+              pet_cwd2 = pet_mod[3],
+              pet_pet = pet_mod[4],
+              pet_pet2 = pet_mod[5]))
+}
+
+bs_constant <- function(data){
+  # data <- data %>% # Needed to add this since block bootstrap is returning nested tibble
+  #   unnest(cols = c(data))
+  const_sens <- data %>% 
+    summarise(cwd_const_sens = weighted.mean(cwd_coef, cwd_errorweights),
+          pet_const_sens = weighted.mean(pet_coef, pet_errorweights),
+          int_const_sens = weighted.mean(int_coef, pet_errorweights))
+  return(const_sens)
+}
+
+
+## Create dataframe holding bootstrap samples
+boot_df <- block_draw_df %>%
+  select(-iter_idx) %>% 
+  group_by(boot_id) %>% 
+  nest()
+
+
+## Estimate second stage models
+boot_df <- boot_df %>% 
+  mutate(const_sens = map(.x = data, .f = bs_constant)) %>%
+  unnest_wider(const_sens) %>%
+  mutate(estimates = map(.x = data, .f = bs_ss)) %>% 
+  unnest_wider(estimates) %>% 
+  select(-data) %>% 
+  ungroup()
+
+
+## Save out bootstrapped coefficients
+write_rds(boot_df, paste0(wdir, "2_output/second_stage/ss_bootstrap.rds"))
+```
+
+
+## Run Predictions.R (6)
+```{r}
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Authors: Robert Heilmayr, Joan Dudney, Frances Moore
+# Project: Treeconomics
+# Date: 5/27/20
+# Purpose: Create predictions of growth impacts from climate change
+#
+# Input files:
+# - ss_bootstrap.rds: R model object saved from Second stage
+# - sp_clim_predictions.gz:
+# 
+# Output files
+# - sp_rwi/<sp_code>.gz:
+#
+# ToDo:
+#
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Package imports --------------------------------------------------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+library(fixest)
+# library(raster)
+library(sp)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(patchwork)
+library(tidyverse)
+library(dtplyr)
+library(prediction)
+library(tictoc)
+library(furrr)
+library(snow)
+library(profvis)
+library(tmap)
+library(tidylog)
+
+n_cores <- availableCores() - 12
+future::plan(multisession, workers = n_cores)
+
+my_seed <- 5597
+
+n_mc <- 10000
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Load data --------------------------------------------------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Define path
+data_dir <- "~/../../capstone/climatree/dataverse-archive/"
+output_dir <- "~/../../capstone/climatree/output-data/step-1-output/"
+
+# Create output directories
+out_dir <- paste0(output_dir)
+# dir.create(file.path(out_dir), showWarnings = FALSE)
+dir.create(file.path(paste0(out_dir, "sp_rwi/")), showWarnings = FALSE)
+# dir.create(file.path(paste0(out_dir, "sp_hot_cells/")), showWarnings = FALSE)
+                      
+# 1. Second stage model
+mod_df <- read_rds(paste0(wdir, "2_output/second_stage/ss_bootstrap.rds"))
+mod_df <- mod_df %>% 
+  rename(iter_idx = boot_id)
+
+# 2. Species-standardized historic and future climate
+sp_clim <- read_rds(paste0(wdir, "2_output/climate/sp_clim_predictions.gz"))
+species_list <- sp_clim %>% select(sp_code)
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Assign MC coefs and CMIP models  ---------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+## Join second stage coefficients to species list
+sp_mc <- species_list %>% 
+  select(sp_code) %>% 
+  crossing(iter_idx = seq(n_mc)) %>% 
+  left_join(mod_df, by = "iter_idx")
+
+
+## Assign specific cmip realization to each MC iteration 
+n_cmip_mods <- 47
+cmip_assignments <- tibble(iter_idx = seq(1, n_mc)) %>% 
+  mutate(cmip_idx = sample(seq(n_cmip_mods), n_mc, replace = TRUE))
+
+## Join cmip model assignments
+sp_mc <- sp_mc %>% 
+  left_join(cmip_assignments, by = "iter_idx")
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Define functions ---------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+predict_sens <- function(sppp_code, 
+                         int_int, int_cwd, int_cwd2, int_pet, int_pet2, 
+                         cwd_int, cwd_cwd, cwd_cwd2, cwd_pet, cwd_pet2, 
+                         pet_int, pet_cwd, pet_cwd2, pet_pet, pet_pet2){
+  ## Function used to predict species' sensitivity rasters based on historic 
+  ## climate and randomly drawn parameters from second stage model.
+  
+  select <- dplyr::select
+  
+  sp_df <- (sp_clim %>% 
+    filter(sp_code == sppp_code) %>% 
+    pull(clim_historic_sp))[[1]] %>% 
+    lazy_dt()
+  
+  sp_df <- sp_df %>% 
+    rename(cwd_hist = cwd,
+           pet_hist = pet) %>%
+    mutate(cwd_sens = cwd_int + (cwd_cwd * cwd_hist) + (cwd_cwd2 * cwd_hist * cwd_hist) + (cwd_pet * pet_hist) + (cwd_pet2 * pet_hist * pet_hist),
+           pet_sens = pet_int + (pet_cwd * cwd_hist) + (pet_cwd2 * cwd_hist * cwd_hist) + (pet_pet * pet_hist) + (pet_pet2 * pet_hist * pet_hist),
+           intercept = int_int + (int_cwd * cwd_hist) + (int_cwd2 * cwd_hist * cwd_hist) + (int_pet * pet_hist) + (int_pet2 * pet_hist * pet_hist)) %>% 
+    select(-cwd_hist, -pet_hist) %>% 
+    as_tibble()
+  
+  return(sp_df)
+}
+
+
+calc_rwi_partials <- function(sppp_code, cmip_id, sensitivity, cwd_const_sens, pet_const_sens, int_const_sens){
+  select <- dplyr::select
+  
+  ## Function used to predict species' RWI rasters based on predicted 
+  ## sensitivity raster and assigned CMIP model of future climate. Also
+  ## integrates calculations of partialling our climate / sensitivity variations
+  
+  ## Predict RWI under CMIP scenario
+  sp_fut_clim <- sp_clim %>% 
+    filter(sp_code == sppp_code) %>% 
+    pull(clim_cmip_sp)
+  sp_fut_clim <- sp_fut_clim[[1]] %>% 
+    lazy_dt() %>% 
+    select(x,y,
+           cwd_cmip_end = paste0("cwd_cmip_end", as.character(cmip_id)),
+           pet_cmip_end = paste0("pet_cmip_end", as.character(cmip_id)),
+           cwd_cmip_start = paste0("cwd_cmip_start", as.character(cmip_id)),
+           pet_cmip_start = paste0("pet_cmip_start", as.character(cmip_id))) %>% 
+    left_join(sensitivity, by = c("x", "y")) %>% 
+    mutate(rwi_pred_end = intercept + (pet_cmip_end * pet_sens) + (cwd_cmip_end * cwd_sens),
+           rwi_pred_start = intercept + (pet_cmip_start * pet_sens) + (cwd_cmip_start * cwd_sens),
+           rwi_pclim_end = int_const_sens + (pet_cmip_end * pet_const_sens) + (cwd_cmip_end * cwd_const_sens),
+           rwi_pclim_start = int_const_sens + (pet_cmip_start * pet_const_sens) + (cwd_cmip_start * cwd_const_sens)) %>% 
+    select(x,y,
+           cwd_sens,
+           pet_sens,
+           intercept,
+           rwi_pred_end,
+           rwi_pred_start,
+           rwi_pclim_end,
+           rwi_pclim_start) %>% 
+    as_tibble()
+  
+  return(sp_fut_clim)
+}
+
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Compute sensitivity, RWI for each species by MC combination ---------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+pull_layer <- function(brick, layer_name){
+  pulled_layer <- brick %>% subset(layer_name)
+}
+
+
+calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
+  set.seed(my_seed) # Re-setting seed at start of each iteration to ensure interrupted jobs still produce replicable results
+  tic()
+
+  ## Iterating through each species
+  print(spp_code)
+  
+  ## Calculate n_mc versions of species' sensitivity raster
+  if (parallel == TRUE) {
+    sp_predictions <- mc_data %>% 
+      mutate(sensitivity = future_pmap(list(sppp_code = spp_code,
+                                            int_int = int_int,
+                                            int_cwd = int_cwd,
+                                            int_cwd2 = int_cwd2,
+                                            int_pet = int_pet,
+                                            int_pet2 = int_pet2,
+                                            cwd_int = cwd_int,
+                                            cwd_cwd = cwd_cwd,
+                                            cwd_cwd2 = cwd_cwd2,
+                                            cwd_pet = cwd_pet,
+                                            cwd_pet2 = cwd_pet2,
+                                            pet_int = pet_int,
+                                            pet_cwd = pet_cwd,
+                                            pet_cwd2 = pet_cwd2,
+                                            pet_pet = pet_pet,
+                                            pet_pet2 = pet_pet2),
+                                       .f = predict_sens,
+                                       .options = furrr_options(seed = my_seed, 
+                                                                packages = c( "dplyr", "raster", "dtplyr"))))
+  } else {
+    sp_predictions <- mc_data %>% 
+      mutate(sensitivity = pmap(list(sppp_code = spp_code,
+                                     int_int = int_int,
+                                     int_cwd = int_cwd,
+                                     int_cwd2 = int_cwd2,
+                                     int_pet = int_pet,
+                                     int_pet2 = int_pet2,
+                                     cwd_int = cwd_int,
+                                     cwd_cwd = cwd_cwd,
+                                     cwd_cwd2 = cwd_cwd2,
+                                     cwd_pet = cwd_pet,
+                                     cwd_pet2 = cwd_pet2,
+                                     pet_int = pet_int,
+                                     pet_cwd = pet_cwd,
+                                     pet_cwd2 = pet_cwd2,
+                                     pet_pet = pet_pet,
+                                     pet_pet2 = pet_pet2),
+                                       .f = predict_sens))
+  }
+  sp_predictions <- sp_predictions %>% 
+    mutate(cwd_const_sens = cwd_int,
+           pet_const_sens = pet_int,
+           int_const_sens = int_int)
+  
+  sp_predictions <- sp_predictions %>% 
+    select(iter_idx, cmip_idx, sensitivity, cwd_const_sens, pet_const_sens, int_const_sens)
+  gc(verbose = TRUE)
+  
+
+
+  ## Predict future RWI for each of n_mc run
+  if (parallel == TRUE){
+    sp_predictions <- sp_predictions %>% 
+      mutate(rwi_predictions = future_pmap(list(sppp_code = spp_code,
+                                                cmip_id = cmip_idx,
+                                                sensitivity = sensitivity,
+                                                cwd_const_sens = cwd_const_sens,
+                                                pet_const_sens = pet_const_sens,
+                                                int_const_sens = int_const_sens),
+                                           .f = calc_rwi_partials,
+                                           .options = furrr_options(seed = my_seed,
+                                                                    packages = c("raster", "dplyr", "dtplyr"))))     
+  } else {
+    sp_predictions <- sp_predictions %>% 
+      mutate(rwi_predictions = pmap(list(sppp_code = spp_code,
+                                                cmip_id = cmip_idx,
+                                                sensitivity = sensitivity,
+                                         cwd_const_sens = cwd_const_sens,
+                                         pet_const_sens = pet_const_sens,
+                                         int_const_sens = int_const_sens),
+                                           .f = calc_rwi_partials)) 
+  }
+  sp_predictions <- sp_predictions %>% 
+    select(iter_idx, rwi_predictions) %>% 
+    unnest(rwi_predictions) %>% 
+    mutate(rwi_pred_change = rwi_pred_end - rwi_pred_start,
+           rwi_pclim_change = rwi_pclim_end - rwi_pclim_start, 
+           rwi_pred_pclim_change_dif = rwi_pred_change - rwi_pclim_change)
+    
+  gc(verbose = TRUE)
+  
+  
+  ## Calculate aggregate stats by run
+  agg_stats <- sp_predictions %>% 
+    # mutate(change_dif = rwi_pred_change - rwi_pclim_change) %>% 
+    group_by(iter_idx) %>% 
+    summarise(rwi_pred_change = mean(rwi_pred_change),
+              rwi_pclim_change = mean(rwi_pclim_change))
+              # change_dif = mean(change_dif))
+  
+  ## Prep historic climate data
+  sp_hist <- (sp_clim %>% 
+                filter(sp_code == spp_code) %>% 
+                pull(clim_historic_sp))[[1]] %>% 
+    rename(cwd_hist = cwd,
+           pet_hist = pet)
+  
+  # ## Write out full mc rwi change results for subset of hot cells (pet ~= 1)
+  # hot_cells <- sp_hist %>% filter(pet_hist > 0.9, pet_hist < 1.1)
+  # hot_cells <- hot_cells %>% 
+  #   lazy_dt() %>% 
+  #   left_join(sp_predictions, by = c("x", "y")) %>% 
+  #   mutate(sp_code = spp_code) %>% 
+  #   select(sp_code, iter_idx, x, y, cwd_hist, pet_hist, rwi_pred_change) %>% 
+  #   as.data.frame()
+  # hot_cells %>% 
+  #   write_rds(file = paste0(out_dir, "sp_hot_cells/", spp_code, ".gz"), compress = "gz")
+  # 
+  # ## Contrast RWI change in wettest and dryest sites (all warm)
+  # pet_range <- sp_hist %>% pull(pet_hist) %>% quantile(c(0.75, 1))
+  # hot_cells <- sp_hist %>% filter(pet_hist > pet_range[1], pet_hist < pet_range[2])
+  # cwd_quantile <- hot_cells %>% pull(cwd_hist) %>% quantile(c(0.1, 0.9))
+  # wet_cells <- hot_cells %>% filter(cwd_hist < cwd_quantile[1]) %>% 
+  #   mutate(wet_dry = "wet")
+  # dry_cells <- hot_cells %>% filter(cwd_hist > cwd_quantile[2]) %>% 
+  #   mutate(wet_dry = "dry")
+  # extreme_cells <- rbind(wet_cells, dry_cells)
+  # 
+  # extreme_cells <- extreme_cells %>% 
+  #   lazy_dt() %>% 
+  #   left_join(sp_predictions, by = c("x", "y")) %>% 
+  #   group_by(iter_idx, wet_dry) %>% 
+  #   summarise(rwi_change = mean(rwi_pred_change)) %>% 
+  #   pivot_wider(names_from = wet_dry, values_from = rwi_change) %>% 
+  #   mutate(wet_dry_dif = wet - dry) %>% 
+  #   as.data.frame()
+  #   
+  # agg_stats <- agg_stats %>%
+  #   left_join(extreme_cells %>% select(iter_idx, wet_dry_dif), by = "iter_idx")
+  
+  
+  # ## Contrast RWI change under two scenarios for PET-centered sites
+  # pet_range = sp_hist$pet_hist %>% quantile(c(0.45, 0.55))
+  # pet_cells <- sp_hist %>% filter(pet_hist > pet_range[1], pet_hist < pet_range[2])
+  # cwd_quantile <- pet_cells %>% pull(cwd_hist) %>% quantile(c(0.1, 0.9))
+  # wet_cells <- pet_cells %>% filter(cwd_hist < cwd_quantile[1]) %>% 
+  #   mutate(wet_dry = "wet")
+  # dry_cells <- pet_cells %>% filter(cwd_hist > cwd_quantile[2]) %>% 
+  #   mutate(wet_dry = "dry")
+  # extreme_cells <- rbind(wet_cells, dry_cells)
+  # 
+  # extreme_cells <- extreme_cells %>% 
+  #   lazy_dt() %>% 
+  #   left_join(sp_predictions, by = c("x", "y")) %>% 
+  #   group_by(iter_idx, wet_dry) %>% 
+  #   summarise(rwi_pred_change = mean(rwi_pred_change),
+  #             rwi_pclim_change = mean(rwi_pclim_change)) %>% 
+  #   pivot_wider(names_from = wet_dry, values_from = c(rwi_pclim_change, rwi_pred_change)) %>% 
+  #   mutate(wet_pred_pclim_dif = rwi_pred_change_wet - rwi_pclim_change_wet,
+  #          dry_pred_pclim_dif = rwi_pred_change_dry - rwi_pclim_change_dry) %>% 
+  #   as.data.frame()
+  # 
+  # agg_stats <- agg_stats %>%
+  #   left_join(extreme_cells %>% select(iter_idx, wet_pred_pclim_dif, dry_pred_pclim_dif),
+  #             by = "iter_idx")
+  
+  
+  ## For each species, calculate cell-wise quantiles of variables from n_mc runs
+  sp_predictions <- sp_predictions %>% 
+    lazy_dt()
+  
+  sp_predictions <- sp_predictions %>% 
+    group_by(x, y) %>% 
+    summarise(rwi_pred_mean = mean(rwi_pred_end),
+              rwi_pred_025 = quantile(rwi_pred_end, 0.025),
+              rwi_pred_050 = quantile(rwi_pred_end, 0.05),
+              rwi_pred_975 = quantile(rwi_pred_end, 0.975),
+              rwi_pred_950 = quantile(rwi_pred_end, 0.95),
+              rwi_pclim_mean = mean(rwi_pclim_end),
+              rwi_pclim_025 = quantile(rwi_pclim_end, 0.025),
+              rwi_pclim_975 = quantile(rwi_pclim_end, 0.975),
+              rwi_pred_change_mean = mean(rwi_pred_change),
+              rwi_pred_change_025 = quantile(rwi_pred_change, 0.025),
+              rwi_pred_change_050 = quantile(rwi_pred_change, 0.050),
+              rwi_pred_change_950 = quantile(rwi_pred_change, 0.95),
+              rwi_pred_change_975 = quantile(rwi_pred_change, 0.975),
+              rwi_pclim_change_mean = mean(rwi_pclim_change),
+              rwi_pclim_change_025 = quantile(rwi_pclim_change, 0.025),
+              rwi_pclim_change_975 = quantile(rwi_pclim_change, 0.975),
+              rwi_pred_pclim_change_dif_mean = mean(rwi_pred_pclim_change_dif),
+              rwi_pred_pclim_change_dif_025 = quantile(rwi_pred_pclim_change_dif, 0.025),
+              rwi_pred_pclim_change_dif_975 = quantile(rwi_pred_pclim_change_dif, 0.975),
+              cwd_sens = mean(cwd_sens),
+              pet_sens = mean(pet_sens),
+              int_sens = mean(intercept),
+              # cwd_cmip_start = mean(cwd_cmip_start),
+              # pet_cmip_start = mean(pet_cmip_start),
+              # cwd_cmip_end = mean(cwd_cmip_end),
+              # pet_cmip_end = mean(pet_cmip_end),
+              sp_code = spp_code,
+              .groups = "drop")
+
+  ## Add back observed climate data
+  sp_predictions <- sp_predictions %>% 
+    left_join(sp_hist, by = c("x", "y"))
+  
+  ## Add observed and predicted climate data
+  sp_cmip <- (sp_clim %>% 
+    filter(sp_code == spp_code) %>% 
+    pull(clim_cmip_sp))[[1]]
+  
+  sp_cmip <- sp_cmip %>%
+    rowwise() %>% 
+    mutate(pet_cmip_end_mean = mean(c_across(starts_with("pet_cmip_end"))),
+           cwd_cmip_end_mean = mean(c_across(starts_with("cwd_cmip_end"))),
+           pet_cmip_start_mean = mean(c_across(starts_with("pet_cmip_start"))),
+           cwd_cmip_start_mean = mean(c_across(starts_with("cwd_cmip_start")))) %>% 
+    select(x, y, cwd_cmip_start_mean, cwd_cmip_end_mean, pet_cmip_start_mean, pet_cmip_end_mean)
+
+  sp_predictions <- sp_predictions %>% 
+    left_join(sp_cmip, by = c("x", "y")) %>% 
+    as_tibble()
+  
+  ## Write out
+  sp_predictions %>% 
+    write_rds(file = paste0(out_dir, "sp_rwi/", spp_code, ".gz"), compress = "gz")
+  
+  toc()
+  return(agg_stats)
+}
+
+
+mc_nests <- sp_mc %>%
+  group_by(sp_code) %>%
+  nest() %>% 
+  drop_na()
+
+# Generally have memory issues with 38 (LAGM), and 93 (PISY) - need to run these with two cores
+# large_range_sp <- c("lagm", "pisy")
+# spp_code = "abal"
+# mc_data = mc_nests %>% filter(sp_code == spp_code) %>% pull(data)
+# mc_data = mc_data[[1]]
+# parallel = FALSE
+
+# mc_nests_large <- mc_nests %>% 
+#   filter((sp_code %in% large_range_sp)) %>% 
+#   mutate(predictions = pmap(list(spp_code = sp_code,
+#                                  mc_data = data,
+#                                  parallel = TRUE),
+#                             .f = calc_rwi_quantiles))
+
+mc_nests_small <- mc_nests %>% 
+  # filter(!(sp_code %in% large_range_sp)) %>% 
+  mutate(predictions = pmap(list(spp_code = sp_code,
+                                 mc_data = data,
+                                 parallel = TRUE),
+                              .f = calc_rwi_quantiles)) 
+
+agg_stats <- mc_nests_small %>% 
+  select(-data) %>% 
+  unnest(predictions) %>% 
+  write_rds(file = paste0(out_dir, "mc_agg_stats.gz"), compress = "gz")
+
+
+test <- agg_stats %>% 
+  group_by(iter_idx) %>% 
+  summarise(rwi_pred_change = mean(rwi_pred_change))
+test %>%
+  pull(rwi_pred_change) %>% 
+  quantile(c(0.025, 0.5, 0.975))
+ 
+
+
+
+# # Profiling of main function
+# spp_code = "juex"
+# mc_data = (mc_nests %>% filter(sp_code == spp_code) %>% pull(data))[[1]]
+# l = profvis(calc_rwi_quantiles(spp_code, mc_data))
+
+
+
+
+
+
+# %>% 
+#   select(-data) %>% 
+#   unnest(predictions)
+
+# mc_nests %>% 
+#   saveRDS(file = paste0(wdir,"out/predictions/rwi_predictions.rds"))
+
+
+# # # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# # # Thought experiments - partialling out mechanisms    ---------------
+# # # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# # calc_rwi_partial_sens <- function(cmip_rast, sensitivity){ # NOTE: Should the means be calculated across full range rather than by each species?
+# #   mean_fut_cwd <- cmip_rast %>% subset("cwd.spstd") %>% cellStats(stat = "mean")
+# #   mean_fut_pet <- cmip_rast %>% subset("pet.spstd") %>% cellStats(stat = "mean")
+# #   cwd_sens = sensitivity %>% subset("cwd_sens")
+# #   pet_sens = sensitivity %>% subset("pet_sens")
+# #   intercept = sensitivity %>% subset("intercept")
+# #   rwi_rast <- intercept + (mean_fut_cwd * cwd_sens) + (mean_fut_pet * pet_sens)
+# #   names(rwi_rast) = "rwi_psens"
+# #   return(rwi_rast)
+# # }
+# # 
+# # calc_rwi_partial_clim <- function(cmip_rast, sensitivity){ # NOTE: Should the means be calculated across full range rather than by each species?
+# #   mean_cwd_sens <- sensitivity %>% subset("cwd_sens") %>% cellStats(stat = "mean")
+# #   mean_pet_sens <- sensitivity %>% subset("pet_sens") %>% cellStats(stat = "mean")
+# #   mean_intercept <-sensitivity %>% subset("intercept") %>% cellStats(stat = "mean") 
+# #   rwi_rast <- mean_intercept + (cmip_rast$cwd.spstd * mean_cwd_sens) + (cmip_rast$pet.spstd * mean_pet_sens)
+# #   names(rwi_rast) = "rwi_pclim"
+# #   return(rwi_rast)
+# # }
+# # 
+# # 
+# # sp_predictions <- sp_predictions %>% 
+# #   mutate(rwi_predictions_partial_sens = map2(.x = clim_future_sp, .y = sensitivity, calc_rwi_partial_sens),
+# #          rwi_predictions_partial_clim = map2(.x = clim_future_sp, .y = sensitivity, calc_rwi_partial_clim))
+# 
+# 
+# #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# # Stack rasters into dataframe ------------------------------------
+# #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# create_prediction_df <- function(spp_predictions){
+#   sp_fut <- (spp_predictions %>% 
+#                pull(clim_future_sp))[[1]]
+#   names(sp_fut) <- c("cwd.fut", "pet.fut")
+#   
+#   sp_hist <- (spp_predictions %>% 
+#                 pull(clim_historic_sp))[[1]]
+#   sp_sens  <- (spp_predictions %>% 
+#                  pull(sensitivity))[[1]]
+#   sp_rwi  <- (spp_predictions %>% 
+#                 pull(rwi_predictions))[[1]]
+#   
+#   sp_rwi_psens  <- (spp_predictions %>% 
+#                       pull(rwi_predictions_partial_sens))[[1]]
+#   
+#   sp_rwi_pclim  <- (spp_predictions %>% 
+#                       pull(rwi_predictions_partial_clim))[[1]]
+#   
+#   clim_compare <- brick(c(sp_fut, sp_hist, sp_sens, sp_rwi, sp_rwi_psens, sp_rwi_pclim))
+#   clim_compare <- clim_compare %>% 
+#     as.data.frame(xy = TRUE) %>% 
+#     drop_na()
+#   return(clim_compare)
+# }
+# 
+# sp_prediction_test <- sp_predictions %>% 
+#   group_by(sp_code, iter_idx) %>% 
+#   nest() %>% 
+#   mutate(pred_df = map(data, create_prediction_df)) %>% 
+#   select(-data) %>% 
+#   unnest(cols = pred_df) %>% 
+#   mutate(cwd_change = cwd.fut - cwd.spstd,
+#          pet_change = pet.fut - pet.spstd,
+#          rwi_null = cwd.spstd * cwd_sens + pet.spstd * pet_sens + intercept,
+#          rwi_change = rwi_pred - rwi_null,
+#          rwi_change_psens = rwi_psens - rwi_null,
+#          rwi_change_pclim = rwi_pclim - rwi_null)
+# 
+# 
+# sp_predictions %>% 
+#   saveRDS(file = paste0(wdir,"out/predictions/sp_predictions.rds") )
+
+
+
+
+
+# crs_template <- crs(cwd_future)
+# cwd_df <- cwd_rast %>% as.data.frame(xy = TRUE) 
+# raster_template <- cwd_df %>% select(x,y)
+# cwd_df <- cwd_df %>% 
+#   drop_na()
+# 
+# cwd_df2 <- raster_template %>% 
+#   left_join(cwd_df, by = c("x", "y"))
+# cwd_rast2 <- rasterFromXYZ(cwd_df2, crs = crs)
+# 
+# tm_raster(cwd_rast2)
+# data("World")
+# 
+# tmap_mode("view")
+# tm_shape(cwd_rast) +
+#   tm_raster()
+# 
+# tmap_mode("view")
+# tm_shape(cwd_vals) +
+#   tm_raster()
+# 
+# 
+# 
+# 
+# 
+# 
+# ############ FUNCTION GRAVEYARD
+# 
+# calc_rwi <- function(sppp_code, cmip_id, sensitivity){
+#   ## Function used to predict species' RWI rasters based on predicted 
+#   ## sensitivity raster and assigned CMIP model of future climate
+#   
+#   sp_fut_clim <- readRDS(paste0(sp_fut_clim_dir, sppp_code, ".gz"))
+#   
+#   cmip_rast <- sp_fut_clim %>% 
+#     filter(cmip_idx == cmip_id) %>% 
+#     pull(clim_future_sp)
+#   
+#   cwd_sens = sensitivity %>% subset("cwd_sens")
+#   pet_sens = sensitivity %>% subset("pet_sens")
+#   intercept = sensitivity %>% subset("intercept")
+#   rwi_rast <- intercept + (cmip_rast[[1]]$cwd.spstd * cwd_sens) + (cmip_rast[[1]]$pet.spstd * pet_sens)
+#   names(rwi_rast) = "rwi_pred"
+#   return(rwi_rast)
+# }
+# 
+# quantiles <- function(x){
+#   ## Defines quantiles used to summarize MC runs
+#   quantile(x, c(0.025, 0.975), na.rm=TRUE)
+# }
+# 
+# # extract_quantiles <- function(rwi_preds){
+# #   ## Extracts desired quantiles for MC runs
+# #   
+# #   rwi_quantiles <- rwi_preds %>% 
+# #     pull(rwi_predictions) %>%
+# #     brick() %>% 
+# #     calc(quantiles)
+# #   return(rwi_quantiles)
+# # }
+# 
+# 
+# calc_mean_fut_clim <- function(sppp_code){
+#   sp_fut_clim <- readRDS(paste0(sp_fut_clim_dir, sppp_code, ".gz"))
+#   clim_pulls <- sp_fut_clim %>%
+#     mutate(cwd.fut = pmap(list(brick = clim_future_sp, layer_name = "cwd.spstd"),
+#                           .f = pull_layer),
+#            pet.fut = pmap(list(brick = clim_future_sp, layer_name = "pet.spstd"),
+#                           .f = pull_layer))
+#   
+#   cwd.fut.q <- clim_pulls %>%
+#     pull(cwd.fut) %>%
+#     brick()
+#   cwd.fut.q <- raster::mean(cwd.fut.q)
+#   names(cwd.fut.q) = "cwd.fut"
+#   
+#   pet.fut.q <- clim_pulls %>%
+#     pull(pet.fut) %>%
+#     brick()
+#   pet.fut.q <- raster::mean(pet.fut.q)
+#   names(pet.fut.q) = "pet.fut"
+#   
+#   out_brick <- brick(c(cwd.fut.q, pet.fut.q))
+#   return(out_brick)
+# }
+```
+
+
+## Re-Create Figure 2
+
+```{r, eval=FALSE}
+#===============================================================================
+# Species deep dive plots
+# 
+# 
+#===============================================================================
+
+
+#===============================================================================
+# 1) Pkg imports ---------
+#===============================================================================
+library(tidyverse)
+library(dbplyr)
+library(RSQLite)
+library(ggplot2)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(sf)
+library(rgeos)
+library(stringr)
+library(raster)
+library(rgdal)
+library(viridis)
+library(patchwork)
+library(effects)
+library(dplR)
+
+select <- dplyr::select
+
+
+base_text_size = 12
+theme_set(
+  theme_bw(base_size = base_text_size)+
+    theme(panel.grid.major = element_blank(), 
+          panel.grid.minor = element_blank(),
+          # text=element_text(family ="Helvetica"),
+          panel.background = element_rect(fill='transparent'), 
+          plot.background = element_rect(fill='transparent', color=NA), 
+          legend.background = element_rect(fill='transparent')))
+
+pt_size = .pt
+
+#===============================================================================
+# 2) Data imports  ---------
+#===============================================================================
+### Define path
+data_dir <- "~/../../capstone/climatree/dataverse-archive/"
+output_dir <- "~/../../capstone/climatree/output-data/step-1-output/"
+
+# 1. Site-level regressions
+flm_df <- read_csv(paste0(output_dir, "site_pet_cwd_std_augmented.csv")) 
+
+# 2. Species range maps
+range_file <- paste0(data_dir, 'merged_ranges_dissolve.shp')
+range_sf <- st_read(range_file)
+
+# 3. Site information
+site_smry <- read_csv(paste0(data_dir, 'site_summary.csv'))
+site_smry <- site_smry %>% 
+  select(collection_id, sp_id, latitude, longitude) %>% 
+  mutate(species_id = tolower(sp_id)) %>% 
+  select(-sp_id)
+# site_loc <- site_smry %>% 
+#   select(collection_id, latitude, longitude)
+# flm_df <- flm_df %>% 
+#   left_join(site_loc, by = "collection_id")
+
+# # 4. Species information
+# sp_info <- read_csv(paste0(wdir, 'species_gen_gr.csv'))
+# sp_info <- sp_info %>% 
+#   select(species_id, genus, gymno_angio, family)
+# site_smry <- site_smry %>% 
+#   left_join(sp_info, by = c("species_id"))
+
+## .....................cant run 5-6.....................................
+
+# 5. Prediction rasters
+rwi_list <- list.files(paste0(wdir, "2_output/predictions/sp_rwi/"), pattern = ".gz", full.names = TRUE)
+sp_predictions <- do.call('rbind', lapply(rwi_list, readRDS))
+
+# 6. Dendro examples - note: exporting two pipo sites in first stage script
+dendro_ex <- read_csv(paste0(data_dir, "2_output/first_stage/example_sites.csv"))
+
+## ......................................................................
+
+
+# 7. Raw dendro file for one site
+rwl_path <- paste0(data_dir, "ca585.rwl")
+rwl_dat <- read.tucson(paste0(rwl_path))
+
+
+
+#===============================================================================
+# Prep climate / prediction data  ---------
+#===============================================================================
+# Define species
+flm_df %>% group_by(species_id) %>% tally() %>% arrange(desc(n))
+
+spp_code <- 'pila'
+
+
+trim_df <- flm_df %>% 
+  filter(species_id == spp_code)
+
+# spp_predictions <- sp_predictions %>% 
+#   filter(sp_code == spp_code)
+
+# sp_fut <- (spp_predictions %>% 
+#              pull(clim_future_sp))[[1]]
+# names(sp_fut) <- c("cwd.fut", "pet.fut")
+# 
+# sp_hist <- (spp_predictions %>% 
+#               pull(clim_historic_sp))[[1]]
+# sp_sens  <- (spp_predictions %>% 
+#                pull(sensitivity))[[1]]
+# sp_rwi  <- (spp_predictions %>% 
+#               pull(rwi_predictions))[[1]]
+# names(sp_rwi) <- "rwi"
+# 
+# 
+# clim_compare <- brick(c(sp_fut, sp_hist, sp_sens, sp_rwi))
+# clim_compare <- clim_compare %>% 
+#   as.data.frame(xy = TRUE)
+
+
+#===============================================================================
+# Define example sites  ---------
+#===============================================================================
+# Pull relevant ITRDB sites
+trim_df <- trim_df %>%
+  drop_na() %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+high_sens = "CO559"
+low_sens = "CA585"
+
+high_coords <- trim_df %>% 
+  filter(collection_id == high_sens) %>% 
+  pull(geometry)
+low_coords <- trim_df %>% 
+  filter(collection_id == low_sens) %>% 
+  pull(geometry)
+
+high_val <- trim_df %>% 
+  filter(collection_id == high_sens) %>% 
+  pull(estimate_cwd.an) %>% 
+  round(digits = 3)
+
+low_val <- trim_df %>% 
+  filter(collection_id == low_sens) %>% 
+  pull(estimate_cwd.an) %>% 
+  round(digits = 3)
+
+
+high_fs <- trim_df %>% filter(collection_id == high_sens)
+low_fs <- trim_df %>% filter(collection_id == low_sens)
+
+high_lab <- paste0("sensitivity = ", as.character(high_val))
+low_lab <- paste0("sensitivity = ", as.character(low_val))
+
+high_color <- "#404788"
+low_color <- "#efca2a"
+low_color <- "#1b9e77"
+
+#440154FF
+
+#===============================================================================
+# Step 1: data and detrending  ---------
+#===============================================================================
+### Map of ITRDB sites and species range
+
+# Pull relevant range map
+sp_range <- range_sf %>% 
+  filter(sp_code == spp_code)
+sp_bbox <- st_bbox(sp_range)
+
+lon_lims <- c(sp_bbox$xmin - 1, sp_bbox$xmax + 1)
+lat_lims <- c(sp_bbox$ymin - 1, sp_bbox$ymax + 1)
+
+# Plot species ranges
+world <- ne_coastline(scale = "medium", returnclass = "sf")
+map <- ggplot(trim_df, aes(x = Longitude, y = Latitude))
+  
+  
+map <- ggplot() +
+  geom_sf(data = world) +
+  geom_sf(data = sp_range, fill = 'black', alpha = .2, colour = NA) +
+  geom_sf(data = trim_df, color = '#B0357B', fill = '#B0357B', alpha = .4) +
+  ylab("Latitude")+
+  xlab("Longitude")+
+  # theme(axis.text.x=element_text(size=base_text_size - 2),
+  #       axis.text.y=element_text(size = base_text_size - 2))+
+  coord_sf(xlim = lon_lims, ylim = lat_lims, expand = FALSE) +
+  scale_x_continuous(breaks=seq(-120,100,10)) +
+  geom_point(aes(x = high_coords[[1]][1], y = high_coords[[1]][2]), color = high_color, size = 3) +
+  geom_point(aes(x = low_coords[[1]][1], y = low_coords[[1]][2]), color = low_color, size = 3) +
+  geom_segment(
+    data = trim_df,
+    x = -105, y = 50,
+    xend = high_coords[[1]][1], yend = high_coords[[1]][2] + 1.3,
+    lineend = "round",
+    linejoin = "round",
+    linewidth = 1,
+    arrow = arrow(length = unit(0.05, "inches"), type = "closed"),
+    colour = high_color
+  ) +
+  geom_label(aes(x = -105, y = 50, label = "Site A"), fill = high_color, color = "white", size = 5, label.size = NA) +
+  geom_segment(
+    data = trim_df,
+    # x = -low_coords[[1]][1] - 20, y = low_coords[[1]][2],
+    x = -120, y = 25,
+    # x = -120, y = 25,
+    xend = low_coords[[1]][1], yend = low_coords[[1]][2] - 1.3,
+    lineend = "round",
+    linejoin = "round",
+    linewidth = 1, 
+    arrow = arrow(length = unit(0.05, "inches"), type = "closed"),
+    colour = low_color
+  ) +
+  geom_label(aes(x = -119, y = 25, label = "Site B"), fill = low_color, color = "white", size = 5, label.size = NA)
+
+map
+# ggsave(paste0(wdir, 'figures/Methods figure/TransparentFigs/map_ex.png'), plot = map, bg= 'transparent', width = 2.25, height = 2.9)
+
+
+
+### Illustrate detrending
+rwl <- rwl_dat %>% select(PPP02B)
+rwi <- rwl %>% 
+  select(PPP02B) %>% 
+  detrend(method = "Spline", make.plot = TRUE)
+detrend_df <- tibble("RWL" = rwl$PPP02B, "RWI" = rwi$PPP02B) %>% 
+  mutate(Spline = RWL / RWI) %>% 
+  drop_na() %>% 
+  mutate(Age = row_number(),
+         Detrend_spline = 1)
+
+rwl_plot <- ggplot(data = detrend_df) +
+  geom_line(aes(x = Age, y = RWL), size = 0.5) +
+  geom_line(aes(x = Age, y = Spline),linetype="dashed", linewidth = 0.25) +
+  ylab("RWL (mm)") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+
+
+rwi_plot <- ggplot(data = detrend_df) +
+  geom_line(aes(x = Age, y = RWI), size = 0.5) +
+  geom_line(aes(x = Age, y = Detrend_spline),linetype="dashed", size = 0.25) +
+  ylab("RWI") +
+  xlab("Age (years)")
+
+despline_plot <- rwl_plot / rwi_plot
+despline_plot
+
+# ggsave(paste0(wdir, 'figures/Methods figure/TransparentFigs/despline.png'), plot = despline_plot, bg= 'transparent', width = 2, height = 2.9)
+
+
+panel_a <- map | despline_plot
+panel_a
+ggsave(paste0(wdir, '3_results/figures/methods_panels/step_1.png'), plot = panel_a, bg= 'transparent', width = 4.25, height = 2.9, dpi = 600)
+
+#===============================================================================
+# Step 2: Climatic range  ---------
+#===============================================================================
+### Plot of climatic range with ITRDB sites
+xmin <- -1.5
+xmax <- 2
+hex <- spp_predictions %>% 
+  ggplot(aes(x = cwd_hist, y = pet_hist)) +
+  geom_density_2d(color = 'grey') +
+  # geom_density_2d(colour = "black") +
+  #geom_density_2d_filled(alpha = .6) +
+  xlim(xmin, xmax) +
+  ylim(xmin, xmax) +
+  # labs(fill = "Number of cells") +
+  ylab("Historic PET\n(Deviation from species mean)") +
+  xlab("Historic CWD\n(Deviation from species mean)") + 
+  coord_fixed() +
+  guides(fill=F, colour=F)+
+  geom_point(data = trim_df, aes(x = cwd.spstd, y = pet.spstd), colour = '#B0357B', alpha = 0.4, size = 0.75) +
+  geom_point(aes(x = high_fs$cwd.spstd, y = high_fs$pet.spstd), color = high_color, size = 3) +
+  geom_point(aes(x = low_fs$cwd.spstd, y = low_fs$pet.spstd), color = low_color, size = 3) +
+  geom_segment(
+    x = 0.5, y = -1.3,
+    xend = high_fs$cwd.spstd + 0.2, yend = high_fs$pet.spstd - 0.04,
+    lineend = "round",
+    linejoin = "round",
+    size = 1, 
+    arrow = arrow(length = unit(0.05, "inches"), type = "closed"),
+    colour = high_color
+  ) +
+  geom_label(aes(x = 0.5, y = -1.3, label = "Site A"), fill = high_color, color = "white", size = 5, label.size = NA) +
+  geom_segment(
+    x = 1, y = -0.8,
+    xend = low_fs$cwd.spstd + 0.2, yend = low_fs$pet.spstd - 0.04,
+    lineend = "round",
+    linejoin = "round",
+    size = 1, 
+    arrow = arrow(length = unit(0.05, "inches"), type = "closed"),
+    colour = low_color
+  ) +
+  geom_label(aes(x = 1, y = -0.8, label = "Site B"), fill = low_color, color = "white", size = 5, label.size = NA)
+hex
+
+ggsave(paste0(wdir, '3_results/figures/methods_panels/step_2.png'), plot = hex, bg= 'transparent', width = 2.9, height = 2.9, dpi = 600)
+
+
+
+#===============================================================================
+# Step 3: First stage for example sites  ---------
+#===============================================================================
+high_ex <- dendro_ex %>% 
+  filter(collection_id == high_sens) %>% 
+  mutate(label="high")
+low_ex <- dendro_ex %>% 
+  filter(collection_id == low_sens) %>% 
+  mutate(label="low")
+
+both_ex <- high_ex %>% 
+  rbind(low_ex)
+
+both_fig <- both_ex %>%
+  ggplot(aes(x = cwd.an.spstd, y = rwi, color=label, fill=label)) +
+  geom_point( alpha=.1) +
+  scale_fill_manual(values = c(high_color, low_color)) +
+  scale_color_manual(values = c(high_color, low_color)) +
+  geom_smooth(method="lm") +
+  #theme_bw(base_size = 25) +
+  #theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+  #plot.title = element_text(hjust = 0.5))+
+  ylab("Ring width index")+
+  xlab("Climatic water deficit") +
+  ylim(c(0,3)) +
+  xlim(c(-1.25, 0))+
+  guides(fill=F, color=F)+
+  geom_label(aes(x = -1.05, y = 2.5, label = "Site A"), fill = high_color, color = "white", size = 5, label.size = NA) +
+  geom_label(aes(x = -0.4, y = 2.5, label = "Site B"), fill = low_color, color = "white", size = 5, label.size = NA)
+# 
+#   annotate("text", x = -1.05, y = 2.5, label = paste("Site A"), color = high_color, size = 12/ pt_size)+
+#   annotate("text", x = -0.4, y = 2.5, label = paste("Site B"), color = low_color, size = 12/ pt_size)
+
+both_fig
+ggsave(paste0(wdir, '3_results/figures/methods_panels/step_3.png'), plot = both_fig, bg= 'transparent', width = 3.5, height = 2.9, dpi = 600)
+
+
+#===============================================================================
+# Step 4: Second stage variation in sensitivity  ---------
+#===============================================================================
+### Plot of cwd sensitivity against cwd.spstd
+mod <- lm(estimate_cwd.an ~ cwd.spstd + I(cwd.spstd^2) + pet.spstd + I(pet.spstd^2), data = trim_df)
+eff = effect("cwd.spstd", mod, partial.residuals=T)
+closest <- function(x, x0) apply(outer(x, x0, FUN=function(x, x0) abs(x - x0)), 1, which.min)
+x.fit <- unlist(eff$x.all)
+trans <- I
+x <- data.frame(lower = eff$lower, upper = eff$upper, fit = eff$fit, cwd = eff$x$cwd.spstd)
+xy <- data.frame(x = x.fit, y = x$fit[closest(trans(x.fit), x$cwd)] + eff$residuals)
+
+partial_plot <- ggplot(filter(x,cwd <=1&fit<=1), aes(x = cwd, y = fit, color="black")) +
+  #theme_bw(base_size = 20)+
+  #theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+  #plot.title = element_text(hjust = 0.5))+
+  geom_line(size = 1,color="black", fill="black") +
+  #scale_color_gradient()+
+  #geom_smooth(method="lm", color="#21908CFF", fill="#21908CFF")+
+  geom_point(data = filter(xy, x<=1&y<=1), aes(x = x, y = y, color= "black"), alpha=.5) +
+  scale_colour_manual(values = "black")+
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.3, fill = "black") +
+  xlab("Historic CWD\n(Deviation from species mean)") +
+  ylab("Partial effect of CWD\non CWD sensitivity")+
+  guides(scale = "none", color=F) +
+  geom_point(aes(x = high_fs$cwd.spstd, y = high_fs$estimate_cwd.an), color = high_color, size = 3) +
+  geom_point(aes(x = low_fs$cwd.spstd, y = low_fs$estimate_cwd.an), color = low_color, size = 3) +
+  geom_segment(
+    x = -0.2, y = -2.4,
+    xend = high_fs$cwd.spstd + 0.1, yend = high_fs$estimate_cwd.an - 0.05,
+    lineend = "round",
+    linejoin = "round",
+    size = 1, 
+    arrow = arrow(length = unit(0.05, "inches"), type = "closed"),
+    colour = high_color
+  ) +
+  geom_label(aes(x = -0.2, y = -2.4, label = "Site A"), fill = high_color, color = "white", size = 5, label.size = NA) +
+  geom_segment(
+    x = -1, y = 0.8,
+    xend = low_fs$cwd.spstd - 0.1, yend = low_fs$estimate_cwd.an + 0.1,
+    lineend = "round",
+    linejoin = "round",
+    size = 1, 
+    arrow = arrow(length = unit(0.05, "inches"), type = "closed"),
+    colour = low_color
+  ) +
+  geom_label(aes(x = -1, y = 0.7, label = "Site B"), fill = low_color, color = "white", size = 5, label.size = NA)
+  # geom_smooth(data = xy, aes(x = trans(x), y = y), 
+#             method = "loess", span = 2/3, linetype = "dashed", se = FALSE)
+partial_plot
+
+ggsave(paste0(wdir, '3_results/figures/methods_panels/step_4.png'), plot = partial_plot, bg= 'transparent', width = 3.75, height = 3.05, dpi = 600)
+
+# combined_plot <- (map_ex | both_fig) / (sens_niche | partial_plot)+ plot_layout(widths = c(1,4))
+# combined_plot
+# combined_plot <- (map_ex | high_ex / low_ex) / (sens_niche | partial_plot)
+# #ggsave(paste0(wdir, "figures\\", "5_sp_example.svg"), combined_plot, width = 15, height = 12)
+
+
+#===============================================================================
+# Step 5: Prediction of sensitivity  ---------
+#===============================================================================
+spp_predictions <- spp_predictions %>% filter(abs(cwd_hist) < 2) ## TODO - FIgure out correct cut-off for predictions
+
+### Map of CWD sensitivity
+cwd_sens_map <- ggplot() +
+  geom_sf(data = world) +
+  geom_raster(data = spp_predictions %>% drop_na(), aes(x = x, y = y, fill = cwd_sens)) +
+  #theme_bw(base_size = 22)+
+  theme(legend.position = c(.15,.18))+
+  ylab("Latitude")+
+  xlab("Longitude")+
+  guides(fill=guide_legend("Sens."))+
+  #scale_fill_viridis_c(direction = -1) +
+  scale_fill_viridis(option="mako", direction = -1)+
+  coord_sf(xlim = lon_lims, ylim = lat_lims, expand = FALSE) +
+  scale_x_continuous(breaks=seq(-120,100,10)) +
+  theme(axis.title.x=element_blank(),
+        axis.title.y = element_blank(),
+        # axis.text.x=element_text(size=base_text_size - 6),
+        # axis.text.y=element_text(size = base_text_size - 6),
+        legend.key.size = unit(8, "pt"),
+        legend.title=element_text(size=base_text_size - 2), 
+        legend.text=element_text(size=base_text_size - 4))+
+  theme()
+cwd_sens_map
+
+ggsave(paste0(wdir, '3_results/figures/methods_panels/step_5.png'), plot = cwd_sens_map, bg= 'transparent', width = 2.25, height = 2.9, dpi = 600)
+
+
+#===============================================================================
+# Step 5: Prediction of RWI change  ---------
+#===============================================================================
+### Map of CWD change
+spp_predictions <- spp_predictions %>% 
+  mutate(cwd_change = cwd_cmip_end_mean - cwd_cmip_start_mean,
+         pet_change = pet_cmip_end_mean - pet_cmip_start_mean)
+
+cwd_change_map <- ggplot() +
+  geom_sf(data = world) +
+  geom_raster(data = spp_predictions %>% drop_na(), aes(x = x, y = y, fill = cwd_change)) +
+  #theme_bw(base_size = 22)+
+  guides(fill=guide_legend("Δ CWD"))+
+  theme(legend.position = c(.18,.15))+
+  ylab("Latitude")+
+  xlab("Longitude")+
+  #scale_fill_viridis_c(direction = -1) +
+  scale_fill_viridis(option="magma")+
+  coord_sf(xlim = lon_lims, ylim = lat_lims, expand = FALSE) +
+  scale_x_continuous(breaks=seq(-120,100,10)) +
+  theme(axis.title.x=element_blank(),
+        axis.title.y = element_blank(),
+        # axis.text.x=element_text(size=base_text_size - 6),
+        # axis.text.y=element_text(size = base_text_size - 6),
+        legend.key.size = unit(8, "pt"),
+        legend.title=element_text(size=base_text_size - 2), 
+        legend.text=element_text(size=base_text_size - 4))
+cwd_change_map
+
+ggsave(paste0(wdir, '3_results/figures/methods_panels/step_6a.png'), plot = cwd_change_map, bg= 'transparent', width = 2.25, height = 2.9, dpi = 600)
+
+
+### Map of predicted RWI
+rwi_map <- ggplot() +
+  geom_sf(data = world) +
+  geom_raster(data = spp_predictions %>% drop_na(), aes(x = x, y = y, fill = rwi_pred_change_mean)) +
+  # theme_bw(base_size = 12)+
+  ylab("Latitude")+
+  xlab("Longitude")+
+  scale_fill_viridis_c(direction = -1) +
+  #scale_fill_viridis(option="mako")+
+  guides(fill=guide_legend(title="Δ RWI"))+
+  coord_sf(xlim = lon_lims, ylim = lat_lims, expand = FALSE) +
+  scale_x_continuous(breaks=seq(-120,100,10)) +
+  theme(legend.position = c(.18,.15),
+        # axis.text.x=element_text(size=base_text_size - 6),
+        # axis.text.y=element_text(size = base_text_size - 6),
+        axis.title.x=element_blank(),
+        axis.title.y = element_blank(),
+        legend.key.size = unit(8, "pt"),
+        legend.title=element_text(size=base_text_size - 2), 
+        legend.text=element_text(size=base_text_size - 4))
+rwi_map
+
+ggsave(paste0(wdir, '3_results/figures/methods_panels/step_6b.png'), plot = rwi_map, bg= 'transparent', width = 2.25, height = 2.9, dpi = 600)
+```
+
