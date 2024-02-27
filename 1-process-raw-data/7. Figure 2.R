@@ -53,6 +53,8 @@ range_sf <- st_read(range_file)
 
 # 3. Site information
 site_smry <- read_csv(paste0(data_dir, 'site_summary.csv'))
+species_metadata <- read_csv(paste0(data_dir, 'species_metadata.csv'))
+
 site_smry <- site_smry %>% 
   select(collection_id, sp_id, latitude, longitude) %>% 
   mutate(species_id = tolower(sp_id)) %>% 
@@ -88,7 +90,7 @@ rwl_dat <- read.tucson(paste0(rwl_path))
 # Define species
 flm_df %>% group_by(species_id) %>% tally() %>% arrange(desc(n))
 
-spp_code <- 'pisy'
+spp_code <- 'pipo'
 
 
 trim_df <- flm_df %>% 
@@ -271,7 +273,7 @@ hex <- spp_predictions %>%
   coord_fixed() +
   guides(fill=F, colour=F)+
   geom_point(data = trim_df, aes(x = cwd.spstd, y = pet.spstd), colour = '#B0357B', alpha = 0.4, size = 0.75) +
-  geom_point(data = high_fs, aes(x = high_fs$cwd.spstd, y = high_fs$pet.spstd), color = high_color, size = 3) +
+  geom_point(data = high_fs, aes(x = cwd.spstd, y = pet.spstd), color = high_color, size = 3) +
   geom_point(data = low_fs, aes(x = cwd.spstd, y = pet.spstd), color = low_color, size = 3) +
   geom_segment(data = high_fs, 
     x = 0.5, y = -1.3,
