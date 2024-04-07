@@ -79,6 +79,7 @@ site_df <- site_df %>%
 flm_df <- flm_df %>% 
   left_join(site_df, by = "collection_id")
 
+
 # Filter for species code pcgl (White Spruce)
 flm_df <- flm_df %>% 
   filter(species_id == "pcgl")
@@ -110,6 +111,7 @@ flm_df <- flm_df %>%
 
 # Save out full flm_df to simplify downstream scripts and ensure consistency
 flm_df %>% write.csv(paste0(output_dir, "site_pet_cwd_std_augmented_pcgl.csv"))
+
 
 # Trim outliers
 trim_df <- flm_df %>% 
