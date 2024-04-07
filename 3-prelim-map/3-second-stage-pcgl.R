@@ -100,15 +100,6 @@ pet_est_bounds = quantile(flm_df$estimate_pet.an, c(0.01, 0.99),na.rm=T)
 cwd_spstd_bounds = quantile(flm_df$cwd.spstd, c(0.01, 0.99), na.rm = T)
 pet_spstd_bounds = quantile(flm_df$pet.spstd, c(0.01, 0.99), na.rm = T)
 
-# flm_df <- flm_df %>%
-#   mutate(outlier = (estimate_cwd.an<cwd_est_bounds[1]) |
-#            (estimate_cwd.an>cwd_est_bounds[2]) |
-#            (estimate_pet.an<pet_est_bounds[1]) |
-#            (estimate_pet.an>pet_est_bounds[2]) |
-#            (cwd.spstd<cwd_spstd_bounds[1]) |
-#            (cwd.spstd>cwd_spstd_bounds[2]) |
-#            (pet.spstd<pet_spstd_bounds[1]) |
-#            (pet.spstd>pet_spstd_bounds[2]))
 
 
 flm_df <- flm_df %>%
@@ -424,7 +415,6 @@ write_rds(boot_df, paste0(output_dir, "ss_bootstrap_pcgl.rds"))
 
 
 
-
 6 
 ###############################################################################
 ###############################################################################
@@ -714,65 +704,6 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
     rename(cwd_hist = cwd,
            pet_hist = pet)
   
-  # ## Write out full mc rwi change results for subset of hot cells (pet ~= 1)
-  # hot_cells <- sp_hist %>% filter(pet_hist > 0.9, pet_hist < 1.1)
-  # hot_cells <- hot_cells %>% 
-  #   lazy_dt() %>% 
-  #   left_join(sp_predictions, by = c("x", "y")) %>% 
-  #   mutate(sp_code = spp_code) %>% 
-  #   select(sp_code, iter_idx, x, y, cwd_hist, pet_hist, rwi_pred_change) %>% 
-  #   as.data.frame()
-  # hot_cells %>% 
-  #   write_rds(file = paste0(out_dir, "sp_hot_cells/", spp_code, ".gz"), compress = "gz")
-  # 
-  # ## Contrast RWI change in wettest and dryest sites (all warm)
-  # pet_range <- sp_hist %>% pull(pet_hist) %>% quantile(c(0.75, 1))
-  # hot_cells <- sp_hist %>% filter(pet_hist > pet_range[1], pet_hist < pet_range[2])
-  # cwd_quantile <- hot_cells %>% pull(cwd_hist) %>% quantile(c(0.1, 0.9))
-  # wet_cells <- hot_cells %>% filter(cwd_hist < cwd_quantile[1]) %>% 
-  #   mutate(wet_dry = "wet")
-  # dry_cells <- hot_cells %>% filter(cwd_hist > cwd_quantile[2]) %>% 
-  #   mutate(wet_dry = "dry")
-  # extreme_cells <- rbind(wet_cells, dry_cells)
-  # 
-  # extreme_cells <- extreme_cells %>% 
-  #   lazy_dt() %>% 
-  #   left_join(sp_predictions, by = c("x", "y")) %>% 
-  #   group_by(iter_idx, wet_dry) %>% 
-  #   summarise(rwi_change = mean(rwi_pred_change)) %>% 
-  #   pivot_wider(names_from = wet_dry, values_from = rwi_change) %>% 
-  #   mutate(wet_dry_dif = wet - dry) %>% 
-  #   as.data.frame()
-  #   
-  # agg_stats <- agg_stats %>%
-  #   left_join(extreme_cells %>% select(iter_idx, wet_dry_dif), by = "iter_idx")
-  
-  
-  # ## Contrast RWI change under two scenarios for PET-centered sites
-  # pet_range = sp_hist$pet_hist %>% quantile(c(0.45, 0.55))
-  # pet_cells <- sp_hist %>% filter(pet_hist > pet_range[1], pet_hist < pet_range[2])
-  # cwd_quantile <- pet_cells %>% pull(cwd_hist) %>% quantile(c(0.1, 0.9))
-  # wet_cells <- pet_cells %>% filter(cwd_hist < cwd_quantile[1]) %>% 
-  #   mutate(wet_dry = "wet")
-  # dry_cells <- pet_cells %>% filter(cwd_hist > cwd_quantile[2]) %>% 
-  #   mutate(wet_dry = "dry")
-  # extreme_cells <- rbind(wet_cells, dry_cells)
-  # 
-  # extreme_cells <- extreme_cells %>% 
-  #   lazy_dt() %>% 
-  #   left_join(sp_predictions, by = c("x", "y")) %>% 
-  #   group_by(iter_idx, wet_dry) %>% 
-  #   summarise(rwi_pred_change = mean(rwi_pred_change),
-  #             rwi_pclim_change = mean(rwi_pclim_change)) %>% 
-  #   pivot_wider(names_from = wet_dry, values_from = c(rwi_pclim_change, rwi_pred_change)) %>% 
-  #   mutate(wet_pred_pclim_dif = rwi_pred_change_wet - rwi_pclim_change_wet,
-  #          dry_pred_pclim_dif = rwi_pred_change_dry - rwi_pclim_change_dry) %>% 
-  #   as.data.frame()
-  # 
-  # agg_stats <- agg_stats %>%
-  #   left_join(extreme_cells %>% select(iter_idx, wet_pred_pclim_dif, dry_pred_pclim_dif),
-  #             by = "iter_idx")
-  
   
   ## For each species, calculate cell-wise quantiles of variables from n_mc runs
   sp_predictions <- sp_predictions %>% 
@@ -844,20 +775,6 @@ mc_nests <- sp_mc %>%
   nest() %>% 
   drop_na()
 
-# Generally have memory issues with 38 (LAGM), and 93 (PISY) - need to run these with two cores
-# large_range_sp <- c("lagm", "pisy")
-# spp_code = "abal"
-# mc_data = mc_nests %>% filter(sp_code == spp_code) %>% pull(data)
-# mc_data = mc_data[[1]]
-# parallel = FALSE
-
-# mc_nests_large <- mc_nests %>% 
-#   filter((sp_code %in% large_range_sp)) %>% 
-#   mutate(predictions = pmap(list(spp_code = sp_code,
-#                                  mc_data = data,
-#                                  parallel = TRUE),
-#                             .f = calc_rwi_quantiles))
-
 mc_nests_small <- mc_nests %>% 
   # filter(!(sp_code %in% large_range_sp)) %>% 
   mutate(predictions = pmap(list(spp_code = sp_code,
@@ -877,7 +794,6 @@ test <- agg_stats %>%
 test %>%
   pull(rwi_pred_change) %>% 
   quantile(c(0.025, 0.5, 0.975))
-
 
 
 
