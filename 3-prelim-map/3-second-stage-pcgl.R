@@ -425,7 +425,7 @@ write_rds(boot_df, paste0(output_dir, "ss_bootstrap_pcgl.rds"))
 
 
 
-6
+6 
 ###############################################################################
 ###############################################################################
 ###############################################################################
@@ -435,7 +435,7 @@ write_rds(boot_df, paste0(output_dir, "ss_bootstrap_pcgl.rds"))
 ###############################################################################
 ###############################################################################
 ###############################################################################
-6
+6 
 
 
 
@@ -1117,7 +1117,11 @@ high_color <- "#404788"
       select(x, y, cwd_change, cwd_sens, rwi_pred_change_mean)
     
     
-    write_rds(spp_predictions, paste0(output_dir, "spp_predictions_pcgl.rds"))
+    # specify new directory to store final table values for each species
+    output_dir2 <- "~/../../capstone/climatree/output/final_output/"
+    
+    # save final tables in new final_output directory
+    write_rds(spp_predictions, paste0(output_dir2, "spp_predictions_pcgl.rds"))
     
     cwd_change_map <- ggplot() +
       geom_sf(data = world) +
@@ -1162,3 +1166,4 @@ high_color <- "#404788"
             legend.title=element_text(size=base_text_size - 2), 
             legend.text=element_text(size=base_text_size - 4))
     rwi_map
+    
