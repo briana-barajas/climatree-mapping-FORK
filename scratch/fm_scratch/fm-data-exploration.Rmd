@@ -99,6 +99,18 @@ site_df <- site_df %>%
 flm_df <- flm_df %>% 
   left_join(site_df, by = "collection_id")
 
+
+# first filter flm_df to only species we need (or filter earlier on)
+species_function <- function(species_id) {
+  
+  species <- flm_df$species_id
+  
+  for (i in seq_along(species))
+  
+  
+}
+
+
 # Filter for species code pcgl (White Spruce)
 flm_df <- flm_df %>% 
   filter(species_id == "pcgl")
