@@ -76,8 +76,8 @@ site_df <- site_df %>%
 
 # Merge back into main flm_df
 flm_df <- flm_df %>% 
-  left_join(site_df, by = "collection_id")
-
+  left_join(site_df, by = "collection_id") %>% 
+  filter(species_id == c("")) # pial, pilo, piar, pila 
 
 # define new folder to store outputs
 output_dir <- "~/../../capstone/climatree/output/test-output/"
@@ -85,10 +85,8 @@ output_dir <- "~/../../capstone/climatree/output/test-output/"
 # re-define flm_df for for loop
 original_flm_df <- flm_df
 
-# define species of interest list (currently top 20)
-spp_code_list <- c("pcgl", "pcma", "pisy", "pcab", "quco", "quve", "piec", "pihe",
-                        "pifl", "pcsi", "pcen", "tsme", "abal", "psme", "quro", "abla", 
-                       "lasi", "laly", "atse", "pist")
+# define species_id column to iterate through for for loop
+spp_code_list <- flm_df$species_id
 
 # for loop for iterating script through all species
   
@@ -106,7 +104,6 @@ spp_code_list <- c("pcgl", "pcma", "pisy", "pcab", "quco", "quve", "piec", "pihe
  #Filter for species code pcgl (White Spruce)
 #flm_df <- flm_df %>% 
   #filter(species_id == "pcgl")
-
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Prep and trim data -----------------------------------------------------
