@@ -49,7 +49,7 @@ n_mc <- 10000
 # Import data --------------------------------------------------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ### Define path
-data_dir <- "~/../../capstone/climatree/raw_data/"
+#data_dir <- "~/../../capstone/climatree/raw_data/"
 output_dir <- "~/../../capstone/climatree/output/1-process-raw-data/"
 
 # 1. Site-level regressions
@@ -79,10 +79,27 @@ site_df <- site_df %>%
 flm_df <- flm_df %>% 
   left_join(site_df, by = "collection_id")
 
+# define new folder to store outputs
+output_dir <- "~/../../capstone/climatree/output/test-output/"
+
+# define species of interest list (currently top 20)
+spp_code_list <- c("pcgl", "pcma", "pisy", "pcab", "quco", "quve", "piec", "pihe",
+                        "pifl", "pcsi", "pcen", "tsme", "abal", "psme", "quro", "abla", 
+                        "lasi", "laly", "atse", "pist")
+
+  
+  for(i in spp_code_list) {
+    
+    flm_df <- flm_df %>% 
+      filter(species_id == i)   # filter for only rows with species of interest
+      
+  
+  
+
 
 # Filter for species code pcgl (White Spruce)
-flm_df <- flm_df %>% 
-  filter(species_id == "pcgl")
+#flm_df <- flm_df %>% 
+  #filter(species_id == "pcgl")
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -110,7 +127,7 @@ flm_df <- flm_df %>%
            (estimate_pet.an>pet_est_bounds[2]))
 
 # Save out full flm_df to simplify downstream scripts and ensure consistency
-flm_df %>% write.csv(paste0(output_dir, "site_pet_cwd_std_augmented_pcgl.csv"))
+flm_df %>% write.csv(paste0(output_dir, "site_pet_cwd_std_augmented_", i, ".csv"))
 
 
 # Trim outliers
@@ -222,7 +239,7 @@ for (site in site_list){
     pull(collection_id)
   block_list[site] <- list(block_sites)
 }
-save(block_list,file=paste0(output_dir,"spatial_blocks_pcgl.Rdat"))
+#save(block_list,file=paste0(output_dir,"spatial_blocks_pcgl.Rdat"))
 # load(file=paste0(wdir,"out/second_stage/spatial_blocks.Rdat"))
 
 
@@ -325,9 +342,9 @@ block_draw_df <- block_draw_df %>%
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Export first stage draws to pull summary stats -------------------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-block_draw_df %>% 
+#block_draw_df %>% 
   # select(boot_id, collection_id, cwd_coef, pet_coef, int_coef, cwd.spstd, pet.spstd) %>% 
-  write_rds(paste0(output_dir, "mc_sample_pcgl.gz"), compress = "gz")
+  #write_rds(paste0(output_dir, "mc_sample_pcgl.gz"), compress = "gz")
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -412,7 +429,14 @@ boot_df <- boot_df %>%
 
 
 ## Save out bootstrapped coefficients
-write_rds(boot_df, paste0(output_dir, "ss_bootstrap_pcgl.rds"))
+write_rds(boot_df, paste0(output_dir, "ss_bootstrap_", i, ".rds"))
+
+
+print(paste0("Processing of tree species ", i, " is complete."))
+
+}
+
+
 
 
 

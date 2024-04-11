@@ -101,10 +101,7 @@ flm_df <- flm_df %>%
   left_join(site_df, by = "collection_id")
 
 # species function for iterating 5A through 25 chosen species
-species_function <- function(species_code) {
-  
-  for(i in sequence(species_code))
-}
+
 
 
 flm_df
