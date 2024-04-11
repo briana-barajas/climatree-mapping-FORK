@@ -3,6 +3,8 @@
 # Project: Mapping Global Tree Vulnerability Under Climate Change
 # Date: 2024-01-28
 # Purpose: 1) Isolate the 20 most common tree species in the ITRDB
+#          2) Check number of sites/trees for key conserevation species
+#          3) Shrink rwi_long.csv to mapped species
 #
 # Input files:
 #   site_summary.csv
@@ -10,7 +12,8 @@
 #   species_metadata.csv
 # 
 # Output files:
-#   NA
+#   rwi_long_trim.csv (trimmed version of rwi_long with key species)
+#
 # 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -88,24 +91,25 @@ rwi_species <- rwi_clean %>%
 # ..... create df listing individual trees .....
 indv_tree_spp <- rwi_species %>% 
   group_by(tree) %>% 
-  summarise(sp_code = first(sp_code), 
-            spp = first(spp),
-            common_name = first(common_name))
+  summarise(sp_code = first(sp_code))
+            # spp = first(spp),
+            # common_name = first(common_name))
 
 # ..... count occurence of each species .....
-sp_count <- plyr::count(indv_tree_spp$spp) %>% 
-  rename(spp = x)
+sp_count <- plyr::count(indv_tree_spp$sp_code) %>% 
+  rename(sp_code = x) %>% 
+  left_join(species_metadata, by = "sp_code")
 
 # plot top 20 collection ID counts
 sp_count %>% 
-  drop_na(spp) %>% 
+  # drop_na(spp) %>% 
   slice_max(order_by = freq, n = 20) %>% 
   ggplot() +
-  geom_col(aes(x = fct_reorder(spp, freq), y = freq), fill = "palegreen4") +
+  geom_col(aes(x = fct_reorder(sp_code, freq), y = freq), fill = "palegreen4") +
   labs(x = "Genus Species",
        y = "Number of Trees Sampled",
        title = "20 Most Prominent Species in Tree Core Dataset") +
-  geom_text(aes(x = fct_reorder(spp, freq), y = freq,
+  geom_text(aes(x = fct_reorder(sp_code, freq), y = freq,
                 label = freq), hjust = 1.2, color = "white", size = 3.5) +
   coord_flip() +
   theme_minimal() #+
@@ -114,4 +118,27 @@ sp_count %>%
 #          ymin = -1, ymax = 731, 
 #          fill = NA, color = "maroon",
 #          linewidth = 1.5)
+
+## =======================================================================
+## ------------------------ Tree Count for Key Species -------------------
+## =======================================================================
+# # check tree count for key species not in top 20
+# key_spp <- sp_count %>%
+#   filter(sp_code %in% c("pilo", "piar", "pila", "pial"))
+# key_spp
+# 
+# # isolate sites for key species
+# key_spp_sites <- rwi_species %>%
+#   filter(sp_code %in% c("pilo", "piar", "pila", "pial"))
+# 
+# # review occurrences
+# unique(key_spp_sites$sp_code) # check spp codes 
+# unique(key_spp$sp_code)
+# length(unique(key_spp_sites$collection_id)) #number sites
+
+#%%%%%%% ISSUE %%%%%%%%%
+# Not all species in the rwi_long data are also in the species_metadata/site_smry
+# data tables, so there are entries lost OR they convert to NAs. Using the original
+# join method there are 
+unique(rwi_species)
 
