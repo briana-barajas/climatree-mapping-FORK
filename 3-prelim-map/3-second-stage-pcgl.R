@@ -1,4 +1,3 @@
-
 5A
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -49,7 +48,7 @@ n_mc <- 10000
 # Import data --------------------------------------------------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ### Define path
-#data_dir <- "~/../../capstone/climatree/raw_data/"
+data_dir <- "~/../../capstone/climatree/raw_data/"
 output_dir <- "~/../../capstone/climatree/output/1-process-raw-data/"
 
 # 1. Site-level regressions
@@ -79,25 +78,32 @@ site_df <- site_df %>%
 flm_df <- flm_df %>% 
   left_join(site_df, by = "collection_id")
 
+
 # define new folder to store outputs
 output_dir <- "~/../../capstone/climatree/output/test-output/"
 
-# define species of interest list (currently top 20)
+# re-define flm_df for for loop
+original_flm_df <- flm_df
+
+ #define species of interest list (currently top 20)
 spp_code_list <- c("pcgl", "pcma", "pisy", "pcab", "quco", "quve", "piec", "pihe",
                         "pifl", "pcsi", "pcen", "tsme", "abal", "psme", "quro", "abla", 
-                        "lasi", "laly", "atse", "pist")
+                       "lasi", "laly", "atse", "pist")
 
+# for loop for iterating script through all species
   
   for(i in spp_code_list) {
     
-    flm_df <- flm_df %>% 
-      filter(species_id == i)   # filter for only rows with species of interest
+    
+    flm_df <- original_flm_df %>% 
+      filter(species_id == i) # filter for only rows with species of interest
       
-  
-  
+    if (nrow(flm_df) == 0) {
+      print(paste0("No data found for species ", i))
+      next
+    }
 
-
-# Filter for species code pcgl (White Spruce)
+ #Filter for species code pcgl (White Spruce)
 #flm_df <- flm_df %>% 
   #filter(species_id == "pcgl")
 
@@ -128,7 +134,7 @@ flm_df <- flm_df %>%
 
 # Save out full flm_df to simplify downstream scripts and ensure consistency
 flm_df %>% write.csv(paste0(output_dir, "site_pet_cwd_std_augmented_", i, ".csv"))
-
+#flm_df %>% write.csv(paste0(output_dir, "site_pet_cwd_std_augmented_pcgl.csv"))
 
 # Trim outliers
 trim_df <- flm_df %>% 
@@ -430,7 +436,7 @@ boot_df <- boot_df %>%
 
 ## Save out bootstrapped coefficients
 write_rds(boot_df, paste0(output_dir, "ss_bootstrap_", i, ".rds"))
-
+#write_rds(boot_df, paste0(output_dir, "ss_bootstrap_pcgl.rds"))
 
 print(paste0("Processing of tree species ", i, " is complete."))
 
