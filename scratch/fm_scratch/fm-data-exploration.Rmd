@@ -100,11 +100,7 @@ site_df <- site_df %>%
 flm_df <- flm_df %>% 
   left_join(site_df, by = "collection_id")
 
-# species function for iterating 5A through 25 chosen species
 
-
-
-flm_df
 # Filter for species code pcgl (White Spruce)
 flm_df <- flm_df %>% 
   filter(species_id == "pcgl")
@@ -809,30 +805,30 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
 }
 
 
-mc_nests <- sp_mc %>%
-  group_by(sp_code) %>%
-  nest() %>% 
-  drop_na()
+#mc_nests <- sp_mc %>%
+  #group_by(sp_code) %>%
+  #nest() %>% 
+  #drop_na()
 
-mc_nests_small <- mc_nests %>% 
+#mc_nests_small <- mc_nests %>% 
   # filter(!(sp_code %in% large_range_sp)) %>% 
-  mutate(predictions = pmap(list(spp_code = sp_code,
-                                 mc_data = data,
-                                 parallel = TRUE),
-                              .f = calc_rwi_quantiles)) 
+  #mutate(predictions = pmap(list(spp_code = sp_code,
+   #                              mc_data = data,
+    #                             parallel = TRUE),
+     #                         .f = calc_rwi_quantiles)) 
 
-agg_stats <- mc_nests_small %>% 
-  select(-data) %>% 
-  unnest(predictions) %>% 
-  write_rds(file = paste0(output_dir, "mc_agg_stats_pcgl.gz"), compress = "gz")
+#agg_stats <- mc_nests_small %>% 
+ # select(-data) %>% 
+  #unnest(predictions) #%>% 
+  #write_rds(file = paste0(output_dir, "mc_agg_stats_pcgl.gz"), compress = "gz")
 
 
-test <- agg_stats %>% 
-  group_by(iter_idx) %>% 
-  summarise(rwi_pred_change = mean(rwi_pred_change))
-test %>%
-  pull(rwi_pred_change) %>% 
-  quantile(c(0.025, 0.5, 0.975))
+#test <- agg_stats %>% 
+ # group_by(iter_idx) %>% 
+  #summarise(rwi_pred_change = mean(rwi_pred_change))
+#test %>%
+ # pull(rwi_pred_change) %>% 
+ # quantile(c(0.025, 0.5, 0.975))
 
 ```
 

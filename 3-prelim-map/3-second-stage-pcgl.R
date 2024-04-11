@@ -85,7 +85,7 @@ output_dir <- "~/../../capstone/climatree/output/test-output/"
 # re-define flm_df for for loop
 original_flm_df <- flm_df
 
- #define species of interest list (currently top 20)
+# define species of interest list (currently top 20)
 spp_code_list <- c("pcgl", "pcma", "pisy", "pcab", "quco", "quve", "piec", "pihe",
                         "pifl", "pcsi", "pcen", "tsme", "abal", "psme", "quro", "abla", 
                        "lasi", "laly", "atse", "pist")
@@ -519,7 +519,7 @@ output_dir <- "~/../../capstone/climatree/output/1-process-raw-data/"
 # Create output directories
 #out_dir <- paste0(wdir,"2_output/predictions/")
 # dir.create(file.path(out_dir), showWarnings = FALSE)
-dir.create(file.path(paste0(output_dir, "sp_rwi/")), showWarnings = FALSE)
+#dir.create(file.path(paste0(output_dir, "sp_rwi/")), showWarnings = FALSE)
 # dir.create(file.path(paste0(out_dir, "sp_hot_cells/")), showWarnings = FALSE)
 
 # 1. Second stage model
@@ -802,30 +802,30 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
 }
 
 
-mc_nests <- sp_mc %>%
-  group_by(sp_code) %>%
-  nest() %>% 
-  drop_na()
+#mc_nests <- sp_mc %>%
+ # group_by(sp_code) %>%
+  #nest() %>% 
+  #drop_na()
 
-mc_nests_small <- mc_nests %>% 
+#mc_nests_small <- mc_nests %>% 
   # filter(!(sp_code %in% large_range_sp)) %>% 
-  mutate(predictions = pmap(list(spp_code = sp_code,
-                                 mc_data = data,
-                                 parallel = TRUE),
-                            .f = calc_rwi_quantiles)) 
+ # mutate(predictions = pmap(list(spp_code = sp_code,
+  #                               mc_data = data,
+   #                              parallel = TRUE),
+    #                        .f = calc_rwi_quantiles)) 
 
-agg_stats <- mc_nests_small %>% 
-  select(-data) %>% 
-  unnest(predictions) %>% 
-  write_rds(file = paste0(output_dir, "mc_agg_stats_pcgl.gz"), compress = "gz")
+#agg_stats <- mc_nests_small %>% 
+ # select(-data) %>% 
+  #unnest(predictions) %>% 
+  #write_rds(file = paste0(output_dir, "mc_agg_stats_pcgl.gz"), compress = "gz")
 
 
-test <- agg_stats %>% 
-  group_by(iter_idx) %>% 
-  summarise(rwi_pred_change = mean(rwi_pred_change))
-test %>%
-  pull(rwi_pred_change) %>% 
-  quantile(c(0.025, 0.5, 0.975))
+#test <- agg_stats %>% 
+ # group_by(iter_idx) %>% 
+  #summarise(rwi_pred_change = mean(rwi_pred_change))
+#test %>%
+ # pull(rwi_pred_change) %>% 
+  #quantile(c(0.025, 0.5, 0.975))
 
 
 
@@ -970,40 +970,40 @@ spp_predictions <- sp_predictions %>%
 # Define example sites  ---------
 #===============================================================================
 # Pull relevant ITRDB sites
-trim_df <- trim_df %>%
-  drop_na() %>%
-  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+#trim_df <- trim_df %>%
+  #drop_na() %>%
+  #st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
 
-high_sens = "CO559"
-low_sens = "CA585"
+#high_sens = "CO559"
+#low_sens = "CA585"
 
-high_coords <- trim_df %>% 
-  filter(collection_id == high_sens) %>% 
-  pull(geometry)
-low_coords <- trim_df %>% 
-  filter(collection_id == low_sens) %>% 
-  pull(geometry)
+#high_coords <- trim_df %>% 
+  #filter(collection_id == high_sens) %>% 
+  #pull(geometry)
+#low_coords <- trim_df %>% 
+  #filter(collection_id == low_sens) %>% 
+  #pull(geometry)
 
-high_val <- trim_df %>% 
-  filter(collection_id == high_sens) %>% 
-  pull(estimate_cwd.an) %>% 
-  round(digits = 3)
+#high_val <- trim_df %>% 
+  #filter(collection_id == high_sens) %>% 
+  #pull(estimate_cwd.an) %>% 
+  #round(digits = 3)
 
-low_val <- trim_df %>% 
-  filter(collection_id == low_sens) %>% 
-  pull(estimate_cwd.an) %>% 
-  round(digits = 3)
+#low_val <- trim_df %>% 
+  #filter(collection_id == low_sens) %>% 
+  #pull(estimate_cwd.an) %>% 
+  #round(digits = 3)
 
 
-high_fs <- trim_df %>% filter(collection_id == high_sens)
-low_fs <- trim_df %>% filter(collection_id == low_sens)
+#high_fs <- trim_df %>% filter(collection_id == high_sens)
+#low_fs <- trim_df %>% filter(collection_id == low_sens)
 
-high_lab <- paste0("sensitivity = ", as.character(high_val))
-low_lab <- paste0("sensitivity = ", as.character(low_val))
+#high_lab <- paste0("sensitivity = ", as.character(high_val))
+#low_lab <- paste0("sensitivity = ", as.character(low_val))
 
-high_color <- "#404788"
-  low_color <- "#efca2a"
-    low_color <- "#1b9e77"
+#high_color <- "#404788"
+  #low_color <- "#efca2a"
+    #low_color <- "#1b9e77"
       
     #440154FF
     
@@ -1057,40 +1057,40 @@ high_color <- "#404788"
     # Step 5: Prediction of RWI change  ---------
     #===============================================================================
     ### Map of CWD change
-    spp_predictions <- spp_predictions %>% 
-      mutate(cwd_change = cwd_cmip_end_mean - cwd_cmip_start_mean,
-             pet_change = pet_cmip_end_mean - pet_cmip_start_mean)
+    #spp_predictions <- spp_predictions %>% 
+      #mutate(cwd_change = cwd_cmip_end_mean - cwd_cmip_start_mean,
+             #pet_change = pet_cmip_end_mean - pet_cmip_start_mean)
     
     spp_predictions <- spp_predictions %>%
-      select(x, y, cwd_change, cwd_sens, rwi_pred_change_mean)
+      select(x, y, cwd_sens, rwi_pred_change_mean)
     
     
     # specify new directory to store final table values for each species
-    output_dir2 <- "~/../../capstone/climatree/output/final_output/"
+    output_dir2 <- "~/../../capstone/climatree/output/test-output/"
     
     # save final tables in new final_output directory
     write_rds(spp_predictions, paste0(output_dir2, "spp_predictions_pcgl.rds"))
     
-    cwd_change_map <- ggplot() +
-      geom_sf(data = world) +
-      geom_raster(data = spp_predictions %>% drop_na(), aes(x = x, y = y, fill = cwd_change)) +
+    #cwd_change_map <- ggplot() +
+      #geom_sf(data = world) +
+      #geom_raster(data = spp_predictions %>% drop_na(), aes(x = x, y = y, fill = cwd_change)) +
       #theme_bw(base_size = 22)+
-      guides(fill=guide_legend("Δ CWD"))+
-      theme(legend.position = c(.18,.15))+
-      ylab("Latitude")+
-      xlab("Longitude")+
+      #guides(fill=guide_legend("Δ CWD"))+
+      #theme(legend.position = c(.18,.15))+
+      #ylab("Latitude")+
+      #xlab("Longitude")+
       #scale_fill_viridis_c(direction = -1) +
-      scale_fill_viridis(option="magma")+
-      coord_sf(xlim = lon_lims, ylim = lat_lims, expand = FALSE) +
-      scale_x_continuous(breaks=seq(-120,100,10)) +
-      theme(axis.title.x=element_blank(),
-            axis.title.y = element_blank(),
+      #scale_fill_viridis(option="magma")+
+      #coord_sf(xlim = lon_lims, ylim = lat_lims, expand = FALSE) +
+      #scale_x_continuous(breaks=seq(-120,100,10)) +
+      #theme(axis.title.x=element_blank(),
+            #axis.title.y = element_blank(),
             # axis.text.x=element_text(size=base_text_size - 6),
             # axis.text.y=element_text(size = base_text_size - 6),
-            legend.key.size = unit(8, "pt"),
-            legend.title=element_text(size=base_text_size - 2), 
-            legend.text=element_text(size=base_text_size - 4))
-    cwd_change_map
+            #legend.key.size = unit(8, "pt"),
+            #legend.title=element_text(size=base_text_size - 2), 
+            #legend.text=element_text(size=base_text_size - 4))
+    #cwd_change_map
     
     
     ### Map of predicted RWI
