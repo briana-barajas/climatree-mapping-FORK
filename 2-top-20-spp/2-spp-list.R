@@ -1,5 +1,5 @@
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# Authors: Rosemary Juarez, Briana Barajas, Fletcher McConnell, Vanessa Salgado
+# Authors: Briana Barajas, Fletcher McConnell, Vanessa Salgado, Rosemary Juarez
 # Project: Mapping Global Tree Vulnerability Under Climate Change
 # Date: 2024-01-28
 # Purpose: 1) Isolate the 20 most common tree species in the ITRDB
@@ -10,7 +10,7 @@
 #   site_summary.csv
 #   rwi_long.csv
 #   species_metadata.csv
-# 
+#
 # Output files:
 #   rwi_long_trim.csv (trimmed version of rwi_long with key species)
 #
@@ -23,23 +23,23 @@
 
 library(tidyverse)
 library(here)
-library(gghighlight)
 
 ## =======================================================================
 ## ---------------------------- Load data --------------------------------
 ## =======================================================================
 
-# set working directory
-remote_wdir <- here("~","..", "..", "capstone", "climatree", "raw_data")
+# set data and output directories
+data_dir <- here("~","..", "..", "capstone", "climatree", "raw_data")
+output_dir <- here("~","..", "..", "capstone", "climatree", "output", "1-process-raw-data")
 
 # read in tree ring data
-rwi_long <- read_csv(here(remote_wdir, "rwi_long.csv"))
+rwi_long <- read_csv(here(data_dir, "rwi_long.csv"))
 
 # read in site summary table
-site_smry <- read_csv(here(remote_wdir, "site_summary.csv"))
+site_smry <- read_csv(here(data_dir, "site_summary.csv"))
 
 # read in species metadata
-species_metadata <- read_csv(here(remote_wdir, "species_metadata.csv"))
+species_metadata <- read_csv(here(data_dir, "species_metadata.csv"))
 
 ## =======================================================================
 ## ---------------------------- Wrangle Data -----------------------------
@@ -56,20 +56,36 @@ rwi_clean <- rwi_long %>%
 
 
 # ...... update species metadata ......
+# metadata contains 159 species codes
 species_metadata <- species_metadata %>% 
-  rename(sp_code = species_id)
+  rename(sp_code = species_id) 
 
 
 # ..... update site smry data .....
+# site smry has 243 species codes
 site_smry <- site_smry %>%
-  select(collection_id, sp_id) %>% 
-  mutate(location_id = collection_id) %>%
   
-  # change sp_id to lower case
-  mutate(sp_code = tolower(sp_id)) %>% 
+  # reduce cols to facilitate join
+  select(collection_id, sp_id, n_trees) %>%
+
+  # change codes to lowercase
+  mutate(sp_code = tolower(sp_id)) %>%
   
-  # remove sp_id column
+  # remove captialized ID column
   select(-sp_id)
+
+## =======================================================================
+## ----------------------- Missing Spp Metadata --------------------------
+## =======================================================================
+# compare spp_codes in metadata (159) vs site summary (243)
+length(unique(site_smry$sp_code)) == length(unique(species_metadata$sp_code))
+
+# total number of individual trees in rwi_long (3100) vs site_smry (98105)
+length(unique(rwi_clean$tree)) == sum(site_smry$n_trees, na.rm = TRUE)
+
+# check for missing values
+colSums(is.na(rwi_clean))
+colSums(is.na(site_smry))
 
 ## =======================================================================
 ## ----------------------------- Join Data -------------------------------
@@ -84,61 +100,91 @@ rwi_species <- rwi_clean %>%
   #join with species metadata
   left_join(y = species_metadata, by = "sp_code")
 
+# check missing values
+# colSums(is.na(rwi_species))
+
+## =======================================================================
+## --------------------------- Filter Top 20 Spp -------------------------
+## =======================================================================
+
+# ..... create df listing each trees once .....
+indv_tree_spp <- rwi_species %>% 
+  select(-c(core, year, gymno_angio, family)) %>% 
+  
+  # group by individual tree sampled
+  group_by(tree) %>% 
+  
+  # isolate first occurrence of the tree and it's species code
+  summarise(tree = first(tree),
+            sp_code = first(sp_code))
+
+# ..... count occurrence of each species .....
+sp_count <- plyr::count(indv_tree_spp$sp_code) %>% 
+  rename(sp_code = x) %>% 
+  inner_join(species_metadata, by = "sp_code") %>% 
+  slice_max(order_by = freq, n = 20) %>% 
+  arrange(sp_code)
+
+## =======================================================================
+## ------------------------ Compare Filter to n_trees --------------------
+## =======================================================================
+# top 20 using n_trees instead of tree
+top_n_trees <- site_smry %>% 
+  group_by(sp_code) %>% 
+  summarise(n_trees = sum(n_trees, na.rm = TRUE)) %>% 
+  slice_max(order_by = n_trees, n = 20) %>% 
+  arrange(sp_code)
+
+# n_trees in original site summary data is missing, so sp_count using tree will be used
+top_n_trees$sp_code
+sp_count$sp_code
+
+
 ## =======================================================================
 ## --------------------------- Chart: Top 20 Spp -------------------------
 ## =======================================================================
 
-# ..... create df listing individual trees .....
-indv_tree_spp <- rwi_species %>% 
-  group_by(tree) %>% 
-  summarise(sp_code = first(sp_code))
-            # spp = first(spp),
-            # common_name = first(common_name))
-
-# ..... count occurence of each species .....
-sp_count <- plyr::count(indv_tree_spp$sp_code) %>% 
-  rename(sp_code = x) %>% 
-  left_join(species_metadata, by = "sp_code")
-
 # plot top 20 collection ID counts
 sp_count %>% 
-  # drop_na(spp) %>% 
-  slice_max(order_by = freq, n = 20) %>% 
   ggplot() +
-  geom_col(aes(x = fct_reorder(sp_code, freq), y = freq), fill = "palegreen4") +
+  geom_col(aes(x = fct_reorder(spp, freq), y = freq), fill = "palegreen4") +
   labs(x = "Genus Species",
        y = "Number of Trees Sampled",
        title = "20 Most Prominent Species in Tree Core Dataset") +
-  geom_text(aes(x = fct_reorder(sp_code, freq), y = freq,
+  geom_text(aes(x = fct_reorder(spp, freq), y = freq,
                 label = freq), hjust = 1.2, color = "white", size = 3.5) +
   coord_flip() +
-  theme_minimal() #+
-# annotate("rect", 
-#          xmin = 10.5, xmax = 6.5, 
-#          ymin = -1, ymax = 731, 
-#          fill = NA, color = "maroon",
-#          linewidth = 1.5)
+  theme_minimal()
+
 
 ## =======================================================================
-## ------------------------ Tree Count for Key Species -------------------
+## ---------------------------- Subset RWI Data --------------------------
 ## =======================================================================
-# # check tree count for key species not in top 20
-# key_spp <- sp_count %>%
-#   filter(sp_code %in% c("pilo", "piar", "pila", "pial"))
-# key_spp
-# 
-# # isolate sites for key species
-# key_spp_sites <- rwi_species %>%
-#   filter(sp_code %in% c("pilo", "piar", "pila", "pial"))
-# 
-# # review occurrences
-# unique(key_spp_sites$sp_code) # check spp codes 
-# unique(key_spp$sp_code)
-# length(unique(key_spp_sites$collection_id)) #number sites
+# .......... create subset with key species ........
+# isolate top 20 species 
+top_sp_codes <- sp_count$sp_code
 
-#%%%%%%% ISSUE %%%%%%%%%
-# Not all species in the rwi_long data are also in the species_metadata/site_smry
-# data tables, so there are entries lost OR they convert to NAs. Using the original
-# join method there are 
-unique(rwi_species)
+# add species code for species of known, high concern
+top_sp_codes <- c(top_sp_codes, "pilo", "piar", "pila", "pial")
+
+# join original data to site summary, filtering based on species list
+rwi_long_subset <- rwi_long %>% 
+  
+  # filter out predictive sample years (2019-2065)
+  filter(year < 2019) %>% 
+  
+  # join to site summary
+  left_join(site_smry, by = "collection_id") %>% 
+  
+  # filter to species in list
+  filter(sp_code %in% top_sp_codes) %>% 
+  
+  # filter back to original columns
+  select(-c(n_trees, sp_code))
+
+# .......... write csv of rwi_long subset ........
+
+write_csv(rwi_long_subset, here(output_dir, "rwi_long_subset.csv"))
+
+
 
