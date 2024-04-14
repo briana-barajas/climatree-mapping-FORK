@@ -77,7 +77,7 @@ site_df <- site_df %>%
 # Merge back into main flm_df
 flm_df <- flm_df %>% 
   left_join(site_df, by = "collection_id") %>% 
-  filter(species_id == c("")) # pial, pilo, piar, pila 
+  filter(species_id == "pial") # input desired species code(s) here to run script 
 
 # define new folder to store outputs
 output_dir <- "~/../../capstone/climatree/output/test-output/"
@@ -103,7 +103,7 @@ spp_code_list <- flm_df$species_id
 
  #Filter for species code pcgl (White Spruce)
 #flm_df <- flm_df %>% 
-  #filter(species_id == "pcgl")
+  #filter(species_id == "psme")
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Prep and trim data -----------------------------------------------------
@@ -279,6 +279,7 @@ n_draws <- block_draw_df %>%
 
 trim_df <- trim_df %>% 
   left_join(n_draws, by = "collection_id")
+
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Random draws of coefs from first stage ---------------------------------
