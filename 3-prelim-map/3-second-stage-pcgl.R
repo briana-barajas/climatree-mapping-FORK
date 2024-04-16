@@ -77,7 +77,7 @@ site_df <- site_df %>%
 # Merge back into main flm_df
 flm_df <- flm_df %>% 
   left_join(site_df, by = "collection_id") %>% 
-  filter(species_id == "pial") # input desired species code(s) here to run script 
+  filter(species_id == "pial") #<<<<<<<<<<<<<<<<<<<------------ input desired species code(s) here to run script------------------------------
 
 # define new folder to store outputs
 output_dir <- "~/../../capstone/climatree/output/test-output/"
@@ -512,7 +512,8 @@ n_mc <- 10000
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Define path
 data_dir <- "~/../../capstone/climatree/raw_data/"
-output_dir <- "~/../../capstone/climatree/output/1-process-raw-data/"
+output_dir1 <- "~/../../capstone/climatree/output/1-process-raw-data/"
+
 
 # Create output directories
 #out_dir <- paste0(wdir,"2_output/predictions/")
@@ -520,14 +521,17 @@ output_dir <- "~/../../capstone/climatree/output/1-process-raw-data/"
 #dir.create(file.path(paste0(output_dir, "sp_rwi/")), showWarnings = FALSE)
 # dir.create(file.path(paste0(out_dir, "sp_hot_cells/")), showWarnings = FALSE)
 
+  for (i in spp_code_list) {
+    
+
 # 1. Second stage model
-mod_df <- read_rds(paste0(output_dir, "ss_bootstrap_pcgl.rds"))
+mod_df <- read_rds(paste0(output_dir2, "ss_bootstrap_", i, ".rds"))
 mod_df <- mod_df %>% 
   rename(iter_idx = boot_id)
 
 # 2. Species-standardized historic and future climate
-sp_clim <- read_rds(paste0(output_dir, "sp_clim_predictions.gz")) %>% 
-  filter(sp_code == "pcgl")
+sp_clim <- read_rds(paste0(output_dir1, "sp_clim_predictions.gz")) %>% 
+  filter(sp_code == i)
 species_list <- sp_clim %>% select(sp_code)
 
 
@@ -793,12 +797,13 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
   
   ## Write out
   sp_predictions %>% 
-    write_rds(paste0(output_dir, "sp_rwi_pcgl.gz"), compress = "gz")
+    write_rds(paste0(output_dir2, "sp_rwi_", i, ".gz"), compress = "gz")
   
   toc()
   return(agg_stats)
 }
 
+}
 
 #mc_nests <- sp_mc %>%
  # group_by(sp_code) %>%
@@ -868,6 +873,7 @@ library(viridis)
 library(patchwork)
 library(effects)
 library(dplR)
+library(terra)
 select <- dplyr::select
 
 
@@ -890,8 +896,11 @@ pt_size = .pt
 data_dir <- "~/../../capstone/climatree/raw_data/"
 output_dir <- "~/../../capstone/climatree/output/1-process-raw-data/"
 
+
+  for(i in spp_code_list) {
+
 # 1. Site-level regressions
-flm_df <- read_csv(paste0(output_dir, "site_pet_cwd_std_augmented_pcgl.csv")) 
+flm_df <- read_csv(paste0(output_dir, "site_pet_cwd_std_augmented_", i, ".csv")) 
 
 # 2. Species range maps
 range_file <- paste0(data_dir, 'merged_ranges_dissolve.shp')
@@ -920,14 +929,14 @@ site_smry <- site_smry %>%
 # 5. Prediction rasters
 #rwi_list <- list.files(paste0(output_dir, "sp_rwi/"), pattern = ".gz", full.names = TRUE)
 #sp_predictions <- do.call('rbind', lapply(rwi_list, readRDS))
-sp_predictions <- read_rds(paste0(output_dir, "sp_rwi_pcgl.gz"))
+sp_predictions <- read_rds(paste0(output_dir, "sp_rwi_", i, ".gz"))
 
 # 6. Dendro examples - note: exporting two pipo sites in first stage script
 dendro_ex <- read_csv(paste0(output_dir, "example_sites.csv"))
 
 # 7. Raw dendro file for one site
-rwl_path <- paste0(data_dir, "ca585.rwl")
-rwl_dat <- read.tucson(paste0(rwl_path))
+#rwl_path <- paste0(data_dir, "ca585.rwl")
+#rwl_dat <- read.tucson(paste0(rwl_path))
 
 
 
@@ -937,7 +946,8 @@ rwl_dat <- read.tucson(paste0(rwl_path))
 # Define species
 flm_df %>% group_by(species_id) %>% tally() %>% arrange(desc(n))
 
-spp_code <- 'pcgl'
+#spp_code <- 'pcgl'
+spp_code <- i
 
 
 trim_df <- flm_df %>% 
@@ -1025,8 +1035,22 @@ spp_predictions <- sp_predictions %>%
     #===============================================================================
     # Step 5: Prediction of sensitivity  ---------
     #===============================================================================
-    spp_predictions <- spp_predictions %>% filter(abs(cwd_hist) < 2)  ## TODO - FIgure out correct cut-off for predictions
+    spp_predictions <- spp_predictions %>% filter(abs(cwd_hist) < 2)  ## TODO - Figure out correct cut-off for predictions
     
+    spp_predictions <- spp_predictions %>%
+      select(x, y, cwd_sens, rwi_pred_change_mean)
+    
+    # create rasters for each species to save
+   # v <- vect(spp_predictions, geom = c("x", "y"), crs = "EPSG:4326")
+   # r <- rast(v, res = 0.5) 
+    #rasterized_raster <- rasterize(v, r, field = "cwd_sens")
+  
+    
+    # specify new directory to store final table values for each species
+    output_dir2 <- "~/../../capstone/climatree/output/test-output/"
+    
+    # save final tables in new final_output directory
+    write_rds(spp_predictions, paste0(output_dir2, "spp_predictions_", i, ".rds"))
     
     ### Map of CWD sensitivity
     cwd_sens_map <- ggplot() +
@@ -1059,15 +1083,10 @@ spp_predictions <- sp_predictions %>%
       #mutate(cwd_change = cwd_cmip_end_mean - cwd_cmip_start_mean,
              #pet_change = pet_cmip_end_mean - pet_cmip_start_mean)
     
-    spp_predictions <- spp_predictions %>%
-      select(x, y, cwd_sens, rwi_pred_change_mean)
+    
+   
     
     
-    # specify new directory to store final table values for each species
-    output_dir2 <- "~/../../capstone/climatree/output/test-output/"
-    
-    # save final tables in new final_output directory
-    write_rds(spp_predictions, paste0(output_dir2, "spp_predictions_pcgl.rds"))
     
     #cwd_change_map <- ggplot() +
       #geom_sf(data = world) +
@@ -1113,3 +1132,4 @@ spp_predictions <- sp_predictions %>%
             legend.text=element_text(size=base_text_size - 4))
     rwi_map
     
+  }
