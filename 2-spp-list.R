@@ -4,7 +4,7 @@
 # Date: 2024-01-28
 # Purpose: 1) Isolate the 20 most common tree species in the ITRDB
 #          2) Check number of sites/trees for key conserevation species
-#          3) Shrink rwi_long.csv to mapped species
+#          3) Subset rwi_long.csv to species being mapped
 #
 # Input files:
 #   site_summary.csv
@@ -12,8 +12,7 @@
 #   species_metadata.csv
 #
 # Output files:
-#   rwi_long_trim.csv (trimmed version of rwi_long with key species)
-#
+#   rwi_long_subset.csv (trimmed version of rwi_long with key species)
 # 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
