@@ -73,7 +73,8 @@ site_clim_csv <- paste0(data_dir, 'essentialcwd_data.csv')
 site_clim_df <- read_csv(site_clim_csv)
 site_clim_df <- site_clim_df %>% 
   mutate("site_id" = as.character(site)) %>% 
-  rename(location_id = site_id)
+  rename(location_id = site_id,
+         precip = ppt) 
 
 # 4. Load species information for sites
 site_smry <- read_csv(paste0(data_dir, 'site_summary.csv'))
@@ -357,16 +358,19 @@ write_rds(sp_cmip_clim, paste0(output_dir, "sp_clim_predictions.", compress = "g
 # niche_df <- niche_df %>% 
 #   select(sp_code = sp_code, sp_pet_mean = pet_mean, sp_pet_sd = pet_sd, sp_cwd_mean = cwd_mean, sp_cwd_sd = cwd_sd)
 
+# ===============================================================
+# Left off here, new data does not have the same column names
+# ===============================================================
 
 # Calculate site-level annual climate
 site_clim_df = site_clim_df %>%
   group_by(location_id, year) %>%
-  summarise(aet.an = sum(aet),
-            cwd.an = sum(cwd),
-            pet.an = sum((aet+cwd)),
-            temp.an = mean(tmean),
-            .groups = "drop")
-
+  summarise(
+    aet.an = sum(aet),
+    cwd.an = sum(cwd),
+    pet.an = sum((aet+cwd)),
+    temp.an = mean(tmean),
+    .groups = "drop")
 
 ### Calculate site-level, average, historic, relative climate (for second stage)
 ## TODO: Note - dropping CANA323 because it has null climate data for a few months each year. might want to dig into this
@@ -387,7 +391,10 @@ ave_site_clim_df <- site_clim_df %>%
 spstd_site_clim_df <- site_smry %>% 
   left_join(ave_site_clim_df, by = "location_id") %>% 
   group_by(sp_code) %>% 
-  nest(data = c(collection_id, cwd.ave, pet.ave, temp.ave)) %>% 
+  nest(data = c(collection_id, 
+                cwd.ave, 
+                # pet.ave, 
+                temp.ave)) %>% 
   left_join(niche_df, by = ("sp_code")) %>%
   drop_na() # Dropping some species due to NA niche data
 
@@ -404,15 +411,24 @@ spstd_site_clim_df <- spstd_site_clim_df %>%
 
 spstd_site_clim_df <- spstd_site_clim_df %>% 
   unnest(site_clim) %>% 
-  rename(cwd.spstd = cwd.ave, pet.spstd = pet.ave, temp.spstd = temp.ave) %>% 
+  rename(cwd.spstd = cwd.ave, 
+         # pet.spstd = pet.ave, 
+         temp.spstd = temp.ave) %>% 
   mutate(cwd.sd = cwd.sd / cwd_sd,
-         pet.sd = pet.sd / pet_sd,
+         # pet.sd = pet.sd / pet_sd,
          temp.sd = temp.sd / temp_sd) %>% 
   ungroup() %>% 
-  select(collection_id, location_id, cwd.spstd, pet.spstd, temp.spstd, cwd.sd, pet.sd, temp.sd)
+  select(collection_id, location_id, cwd.spstd, 
+         # pet.spstd, 
+         temp.spstd, cwd.sd, 
+         # pet.sd, 
+         temp.sd)
 
 spstd_site_clim_df <- spstd_site_clim_df %>% 
-  left_join(ave_site_clim_df %>% select(location_id, cwd.ave, pet.ave, temp.ave), by = "location_id")
+  left_join(ave_site_clim_df %>% select(location_id, 
+                                        cwd.ave, 
+                                        # pet.ave, 
+                                        temp.ave), by = "location_id")
 
 spstd_site_clim_df <- spstd_site_clim_df %>% 
   select(-location_id)
@@ -445,9 +461,14 @@ an_site_clim_df <- an_site_clim_df %>%
 
 an_site_clim_df <- an_site_clim_df %>% 
   unnest(site_clim) %>% 
-  rename(cwd.an.spstd = cwd.an, pet.an.spstd = pet.an, temp.an.spstd = temp.an) %>% 
+  rename(cwd.an.spstd = cwd.an, 
+         # pet.an.spstd = pet.an, 
+         temp.an.spstd = temp.an) %>% 
   ungroup() %>% 
-  select(-aet.an, -pet_mean, -pet_sd, -cwd_mean, -cwd_sd, -temp_mean, -temp_sd, -data, -sp_code)
+  select(
+    # -aet.an, 
+    -pet_mean, 
+    -pet_sd, -cwd_mean, -cwd_sd, -temp_mean, -temp_sd, -data, -sp_code)
 
 an_site_clim_df <- an_site_clim_df %>%
   select(-location_id)
