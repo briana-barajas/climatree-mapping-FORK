@@ -55,6 +55,7 @@ future::plan(multisession, workers = n_cores)
 data_dir <- "~/../../capstone/climatree/raw_data/"
 output_dir <- "~/../../capstone/climatree/output/1-process-raw-data/"
 
+essential <- read_csv(paste0(data_dir,"essentialcwd_data.csv"))
 # 1. Historic climate raster
 #clim_file <- paste0(data_dir, 'HistoricCWD_AETGrids_Annual.Rdat')
 #load(clim_file)
