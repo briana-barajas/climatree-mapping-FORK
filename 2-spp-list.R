@@ -181,9 +181,16 @@ rwi_long_subset <- rwi_long %>%
   # filter back to original columns
   select(-c(n_trees, sp_code))
 
+# .......... create subset of key species metadata ........
+top_sp_codes <- species_metadata %>% 
+  filter(sp_code %in% top_sp_codes) %>% 
+  select(-c(source, gymno_angio, family))
+
 # .......... write csv of rwi_long subset ........
 
 write_csv(rwi_long_subset, here(output_dir, "rwi_long_subset.csv"))
+
+write_csv(top_sp_codes, here(output_dir, "top_sp_codes.csv"))
 
 
 
