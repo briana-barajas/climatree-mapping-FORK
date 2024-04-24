@@ -55,68 +55,31 @@ future::plan(multisession, workers = n_cores)
 data_dir <- "~/../../capstone/climatree/raw_data/"
 output_dir <- "~/../../capstone/climatree/output/1-process-raw-data/"
 
-site_summary <- read_csv(paste0(data_dir, 'HistoricCWD_AETGrids_Annual.Rdat'))
+
 # 1. Historic climate raster
 clim_file <- paste0(data_dir, 'HistoricCWD_AETGrids_Annual.Rdat')
 load(clim_file)
-#cwd_historic <- mean(cwd_historic)
-#aet_historic <- mean(aet_historic)
-#pet_historic <- aet_historic + cwd_historic
-#names(cwd_historic) = "cwd"
-#names(pet_historic) = "pet"
+cwd_historic <- mean(cwd_historic)
+aet_historic <- mean(aet_historic)
+pet_historic <- aet_historic + cwd_historic
+names(cwd_historic) = "cwd"
+names(pet_historic) = "pet"
 
 # 2. Data on historic baseline temp and precip
-#temps_historic <- raster(paste0(data_dir, "monthlycrubaseline_tas"))
-#names(temps_historic) = "temp"
-#temps_historic <- resample(temps_historic, cwd_historic)
-#clim_historic <- raster::brick(list(cwd_historic, pet_historic, temps_historic))
+temps_historic <- raster(paste0(data_dir, "monthlycrubaseline_tas"))
+names(temps_historic) = "temp"
+temps_historic <- resample(temps_historic, cwd_historic)
+clim_historic <- raster::brick(list(cwd_historic, pet_historic, temps_historic))
 
 # 3. Site-specific historic climate data
-#site_clim_csv <- paste0(data_dir, 'essentialcwd_data.csv')
-#site_clim_df <- read_csv(site_clim_csv)
-#site_clim_df <- site_clim_df %>% 
-  #mutate("site_id" = as.character(site)) %>% 
-  #rename(location_id = site_id,
-         #precip = ppt) 
+site_clim_csv <- paste0(data_dir, 'essentialcwd_data.csv')
+site_clim_df <- read_csv(site_clim_csv)
+site_clim_df <- site_clim_df %>% 
+  mutate("site_id" = as.character(site)) %>% 
+  rename(location_id = site_id,
+         precip = ppt) 
 
-# 1. Add terraclimate raster data of historic climates
-cwd_tc <- terra::rast(paste0(data_dir,"TerraClimate19611990_def.nc")) %>%
-  sum() %>% 
-  stack()
-pet_tc <- terra::rast(paste0(data_dir,"TerraClimate19611990_pet.nc")) %>%
-  sum() %>% 
-  stack()
-clim_tc <- terra::raster(list("cwd" = cwd_tc, "pet" = pet_tc))
-
-# 2. Add terraclimate site-month-year data
-tc_pet <- read_csv(paste0(data_dir,"itrdbsites_pet.csv"))
-tc_cwd <- read_csv(paste0(data_dir,"itrdbsites_def.csv"))
-site_clim_df <- tc_pet %>%
-  left_join(tc_cwd, by = c("collection_id", "Month", "year")) %>%
-  rename(month = Month,
-         tc_pet = pet,
-         tc_cwd = def)
-
-# convert site_clim_df to data table for calculation below
-#setDT(site_clim_df)
-
-# 3. Add water year
-# site_clim_df[,water_year:=year]
-# site_clim_df[(latitude>=0) & (month>=10),water_year:=year+1] # Northern hemisphere water year is october through september
-# site_clim_df[(latitude<0) & (month>=7),water_year:=year+1] # Southern hemisphere water year is July through June
-# site_clim_df <- site_clim_df %>% 
-#   as_tibble() %>% 
-#   select(-year) %>% 
-#   rename(year = water_year)
-
-# 4. Calculate site-level annual climate
-site_clim_df = site_clim_df %>%
-  group_by(collection_id, year) %>%
-  summarise(tc_cwd.an = sum(tc_cwd),
-            tc_pet.an = sum(tc_pet),
-            .groups = "drop")
-
-# 5. Load species information for sites
+# 4. Load species information for sites
 site_smry <- read_csv(paste0(data_dir, 'site_summary.csv'))
 site_smry <- site_smry %>%
   select(collection_id, sp_id) %>% 
@@ -136,15 +99,12 @@ site_smry <- site_smry %>%
 # define CRS code for clim_tc
 #clim_crs <- crs(clim_tc)
 
-# 6. Species range maps
+# 5. Species range maps
 range_file <- paste0(data_dir, 'merged_ranges_dissolve.shp')
-range_sf <- st_read(range_file) %>% 
-  st_make_valid() #%>% 
-  #st_transform(clim_crs) # modify range_sf CRS code to match clim_tc CRS
+range_sf <- st_read(range_file) 
 
 
-
-# 7. Climate projections from CMIP5
+# 6. Climate projections from CMIP5
 cmip_end <- load(paste0(data_dir, 'cmip5_cwdaet_end.Rdat'))
 pet_cmip_end <- aet_raster + cwd_raster
 cwd_cmip_end <- cwd_raster
