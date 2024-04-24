@@ -87,7 +87,7 @@ pet_tc <- rast(paste0(data_dir,"TerraClimate19611990_pet.nc")) %>%
 clim_tc <- rast(list("cwd" = cwd_tc, "pet" = pet_tc))
 
 # load species information for sites
-site_smry_ <- read_csv(paste0(data_dir, 'site_summary.csv')) %>% 
+site_smry <- read_csv(paste0(data_dir, 'site_summary.csv')) %>% 
   select(latitude, collection_id)
 
 # 2. Add terraclimate site-month-year data
@@ -96,8 +96,8 @@ tc_cwd <- read_csv(paste0(data_dir,"itrdbsites_def.csv"))
 site_clim_df <- tc_pet %>%
   left_join(tc_cwd, by = c("collection_id", "Month", "year")) %>%
   rename(month = Month,
-         tc_pet = pet,
-         tc_cwd = def) %>% 
+         pet = pet,
+         cwd = def) %>% 
   left_join(site_smry, by = "collection_id")
 
 # 3. Load species information for sites
@@ -123,8 +123,8 @@ setDT(site_clim_df)
 # 5. Calculate site-level annual climate
 site_clim_df = site_clim_df %>%
   group_by(collection_id, year) %>%
-  summarise(tc_cwd.an = sum(tc_cwd),
-            tc_pet.an = sum(tc_pet),
+  summarise(cwd.an = sum(cwd),
+            pet.an = sum(pet),
             .groups = "drop")
 
 
@@ -148,19 +148,19 @@ range_sf <- st_read(range_file) #%>%
 
 
 # 7. Climate projections from CMIP5
-cmip_end <- load(paste0(data_dir, 'cmip5_cwdaet_end.Rdat'))
-pet_cmip_end <- aet_raster + cwd_raster
-cwd_cmip_end <- cwd_raster
-names(cwd_cmip_end) <- NULL # Resetting this due to strange names in file from CMIP processing
-rm(cwd_raster)
-rm(aet_raster)
-
-cmip_start <- load(paste0(data_dir, 'cmip5_cwdaet_start.Rdat'))
-pet_cmip_start <- aet_raster + cwd_raster
-cwd_cmip_start <- cwd_raster
-names(cwd_cmip_start) <- NULL # Resetting this due to strange names in file from CMIP processing
-rm(cwd_raster)
-rm(aet_raster)
+ cmip_end <- load(paste0(data_dir, 'cmip5_cwdaet_end.Rdat'))
+ pet_cmip_end <- aet_raster + cwd_raster
+ cwd_cmip_end <- cwd_raster
+ names(cwd_cmip_end) <- NULL # Resetting this due to strange names in file from CMIP processing
+ rm(cwd_raster)
+ rm(aet_raster)
+ 
+ cmip_start <- load(paste0(data_dir, 'cmip5_cwdaet_start.Rdat'))
+ pet_cmip_start <- aet_raster + cwd_raster
+ cwd_cmip_start <- cwd_raster
+ names(cwd_cmip_start) <- NULL # Resetting this due to strange names in file from CMIP processing
+ rm(cwd_raster)
+ rm(aet_raster)
 
 
 
@@ -228,9 +228,10 @@ pull_clim_tc <- function(spp_code, clim_raster){
 
 
 species_list <- range_sf %>%
+  pull(sp_code) %>% 
   unique() %>% 
-  #enframe(name = NULL) #%>% 
-  #select(sp_code = value) #%>% 
+  enframe(name = NULL) %>% 
+  select(sp_code = value) %>% 
   arrange(sp_code) %>% 
   drop_na()
 
@@ -435,7 +436,7 @@ write_rds(sp_cmip_clim, paste0(output_dir, "sp_clim_predictions.", compress = "g
 
 # Calculate site-level annual climate
 site_clim_df = site_clim_df %>%
-  group_by(location_id, year) %>%
+  group_by(collection_id, year) %>%
   summarise(
     #aet.an = sum(aet),
     cwd.an = sum(cwd),
@@ -446,11 +447,11 @@ site_clim_df = site_clim_df %>%
 ### Calculate site-level, average, historic, relative climate (for second stage)
 ## TODO: Note - dropping CANA323 because it has null climate data for a few months each year. might want to dig into this
 site_clim_df <- site_clim_df %>% 
-  filter(location_id != "CANA323")
+  filter(collection_id != "CANA323")
 
 ave_site_clim_df <- site_clim_df %>% 
   filter(year < 1980) %>% 
-  group_by(location_id) %>% 
+  group_by(collection_id) %>% 
   summarise(cwd.ave = mean(cwd.an),
             pet.ave = mean(pet.an),
             cwd.sd = sd(cwd.an),
@@ -460,13 +461,12 @@ ave_site_clim_df <- site_clim_df %>%
   ungroup()
 
 spstd_site_clim_df <- site_smry %>% 
-  left_join(ave_site_clim_df, by = "location_id") %>% 
+  left_join(ave_site_clim_df, by = "collection_id") %>% 
   group_by(sp_code) %>% 
   nest(data = c(collection_id, 
                 cwd.ave, 
-                pet.ave)) 
-                #temp.ave)) %>% 
-  left_join(niche_df, by = ("sp_code")) %>%
+                pet.ave)) %>% # used to also be temp.ave 
+  left_join(niche_df, by = "sp_code") %>%
   drop_na() # Dropping some species due to NA niche data
 
 spstd_site_clim_df <- spstd_site_clim_df %>% 
@@ -496,10 +496,10 @@ spstd_site_clim_df <- spstd_site_clim_df %>%
          #temp.sd)
 
 spstd_site_clim_df <- spstd_site_clim_df %>% 
-  left_join(ave_site_clim_df %>% select(location_id, 
+  left_join(ave_site_clim_df %>% select(collection_id, 
                                         cwd.ave, 
-                                        pet.ave), by = "location_id") 
-                                        #temp.ave), by = "location_id")
+                                        pet.ave), by = "collection_id") 
+                                        #temp.ave), by = "collection_id")
 
 spstd_site_clim_df <- spstd_site_clim_df %>% 
   select(-location_id)
@@ -513,7 +513,7 @@ write_rds(spstd_site_clim_df,
 
 ### Calculate site-level, annual, historic, relative climate (for first stage) 
 an_site_clim_df <- site_smry %>% 
-  left_join(site_clim_df, by = "location_id") %>% 
+  left_join(site_clim_df, by = "collection_id") %>% 
   group_by(sp_code) %>% 
   nest() %>% 
   left_join(niche_df, by = "sp_code") %>% 

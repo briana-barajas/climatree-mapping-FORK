@@ -21,7 +21,7 @@
 #   site_ave_clim.gz: Tables describing each site's species-standardized average historic climate
 #   site_an_clim.gz: Tables describing each site's annual species-standardized weather
 # 
-# SCRIPT 3b
+# 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -38,8 +38,6 @@ library(raster)
 library(readr)
 library(tmap)
 library(tictoc)
-library(data.table)
-library(terra)
 select <- dplyr::select
 
 
@@ -54,7 +52,6 @@ future::plan(multisession, workers = n_cores)
 # Define path
 data_dir <- "~/../../capstone/climatree/raw_data/"
 output_dir <- "~/../../capstone/climatree/output/1-process-raw-data/"
-
 
 # 1. Historic climate raster
 clim_file <- paste0(data_dir, 'HistoricCWD_AETGrids_Annual.Rdat')
@@ -96,13 +93,10 @@ site_smry <- site_smry %>%
 #   select(-sp_id)
 # site_smry <- rbind(site_smry, site_smry_fia)
 
-# define CRS code for clim_tc
-#clim_crs <- crs(clim_tc)
 
 # 5. Species range maps
 range_file <- paste0(data_dir, 'merged_ranges_dissolve.shp')
-range_sf <- st_read(range_file) 
-
+range_sf <- st_read(range_file)
 
 # 6. Climate projections from CMIP5
 cmip_end <- load(paste0(data_dir, 'cmip5_cwdaet_end.Rdat'))
@@ -134,73 +128,52 @@ rm(aet_raster)
 # Summarize species niches -----------------------------------------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Pull and organize climate distribution for species
-# pull_clim <- function(spp_code){
-#   print(spp_code)
-#   # Pull relevant range map
-#   sp_range <- range_sf %>%
-#     filter(sp_code == spp_code) #%>% 
-#     #rasterize(cwd_historic, getCover=TRUE)
-#   sp_range[sp_range==0] <- NA
-#   
-#   # Pull cwd and aet values
-#   cwd_vals <- cwd_historic %>% 
-#     mask(sp_range) %>% 
-#     as.data.frame(xy = TRUE) %>% 
-#     drop_na()
-#   
-#   pet_vals <- pet_historic %>% 
-#     mask(sp_range) %>% 
-#     as.data.frame(xy = TRUE) %>% 
-#     drop_na()
-#   
-#   temp_vals <- temps_historic %>% 
-#     mask(sp_range) %>% 
-#     as.data.frame(xy = TRUE) %>% 
-#     drop_na()
-#   
-#   # Combine into tibble
-#   clim_vals <- cwd_vals %>% 
-#     left_join(pet_vals, by = c("x", "y")) %>% 
-#     left_join(temp_vals, by = c("x", "y"))
-#   
-#   return(clim_vals)
-# }
-
-# updated pull_clim function using terra, instead of raster
- pull_clim_tc <- function(spp_code, clim_raster){
-   print(spp_code)
-   
-   # Pull relevant range map
-   sp_range <- range_sf %>%
-     filter(sp_code == spp_code)
-   
-   # Pull clim values
-   clim_vals <- clim_raster %>% 
-     mask(mask = sp_range, touches = TRUE) %>% 
-     as.data.frame(xy = TRUE) %>% 
-     drop_na()
-   
-   return(clim_vals)
- }
- 
-
-  species_list <- range_sf %>%
-    unique() %>% 
-    #enframe(name = NULL) #%>% 
-    #select(sp_code = value) #%>% 
-    arrange(sp_code) %>% 
+pull_clim <- function(spp_code){
+  print(spp_code)
+  # Pull relevant range map
+  sp_range <- range_sf %>%
+    filter(sp_code == spp_code) %>% 
+    rasterize(cwd_historic, getCover=TRUE)
+  sp_range[sp_range==0] <- NA
+  
+  # Pull cwd and aet values
+  cwd_vals <- cwd_historic %>% 
+    mask(sp_range) %>% 
+    as.data.frame(xy = TRUE) %>% 
     drop_na()
- 
- pull_clim_tc <- partial(.f = pull_clim_tc, clim_raster = clim_tc)
- 
- clim_df <- species_list %>%
-   mutate(clim_vals = map(sp_code,.f = pull_clim_tc))
+  
+  pet_vals <- pet_historic %>% 
+    mask(sp_range) %>% 
+    as.data.frame(xy = TRUE) %>% 
+    drop_na()
+  
+  temp_vals <- temps_historic %>% 
+    mask(sp_range) %>% 
+    as.data.frame(xy = TRUE) %>% 
+    drop_na()
+  
+  # Combine into tibble
+  clim_vals <- cwd_vals %>% 
+    left_join(pet_vals, by = c("x", "y")) %>% 
+    left_join(temp_vals, by = c("x", "y"))
+  
+  return(clim_vals)
+}
 
-# clim_df <- species_list %>% 
-#   mutate(clim_vals = future_map(sp_code, 
-#                                 .f = pull_clim,
-#                                 .options = furrr_options(packages = c( "dplyr", "raster", "sf")),
-#                                 .progress = TRUE))
+
+species_list <- range_sf %>%
+  pull(sp_code) %>% 
+  unique() %>% 
+  enframe(name = NULL) %>% 
+  select(sp_code = value) %>% 
+  arrange(sp_code) %>% 
+  drop_na()
+
+clim_df <- species_list %>% 
+  mutate(clim_vals = future_map(sp_code, 
+                                .f = pull_clim,
+                                .options = furrr_options(packages = c( "dplyr", "raster", "sf")),
+                                .progress = TRUE))
 
 
 ## Summarize mean and sd of each species' climate
