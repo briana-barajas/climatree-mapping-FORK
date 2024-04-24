@@ -417,9 +417,6 @@ write_rds(boot_df, paste0(output_dir, "ss_bootstrap_pcgl.rds"))
 
 
 
-
-
-
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #
 #                               6 Predictions ----
@@ -744,7 +741,6 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
   toc()
   return(agg_stats)
 }
-
 
 #mc_nests <- sp_mc %>%
 #group_by(sp_code) %>%
