@@ -44,7 +44,7 @@ select <- dplyr::select
 
 
 library(furrr)
-n_cores <- 8
+n_cores <- 20
 future::plan(multisession, workers = n_cores)
 
 
@@ -54,6 +54,7 @@ future::plan(multisession, workers = n_cores)
 # Define path
 data_dir <- "~/../../capstone/climatree/raw_data/"
 output_dir <- "~/../../capstone/climatree/output/1-process-raw-data/"
+
 
 # 1. Historic climate raster
 #clim_file <- paste0(data_dir, 'HistoricCWD_AETGrids_Annual.Rdat')
@@ -85,6 +86,10 @@ pet_tc <- rast(paste0(data_dir,"TerraClimate19611990_pet.nc")) %>%
   sum()
 clim_tc <- rast(list("cwd" = cwd_tc, "pet" = pet_tc))
 
+# load species information for sites
+site_smry_ <- read_csv(paste0(data_dir, 'site_summary.csv')) %>% 
+  select(latitude, collection_id)
+
 # 2. Add terraclimate site-month-year data
 tc_pet <- read_csv(paste0(data_dir,"itrdbsites_pet.csv"))
 tc_cwd <- read_csv(paste0(data_dir,"itrdbsites_def.csv"))
@@ -92,34 +97,35 @@ site_clim_df <- tc_pet %>%
   left_join(tc_cwd, by = c("collection_id", "Month", "year")) %>%
   rename(month = Month,
          tc_pet = pet,
-         tc_cwd = def)
+         tc_cwd = def) %>% 
+  left_join(site_smry, by = "collection_id")
+
+# 3. Load species information for sites
+site_smry <- read_csv(paste0(data_dir, 'site_summary.csv'))
+site_smry <- site_smry %>%
+  select(collection_id, sp_id, latitude) %>% 
+  mutate(location_id = collection_id) %>% 
+  mutate(sp_code = tolower(sp_id)) %>% 
+  select(-sp_id)
 
 # convert site_clim_df to data table for calculation below
-#setDT(site_clim_df)
+setDT(site_clim_df)
 
-# 3. Add water year
-# site_clim_df[,water_year:=year]
-# site_clim_df[(latitude>=0) & (month>=10),water_year:=year+1] # Northern hemisphere water year is october through september
-# site_clim_df[(latitude<0) & (month>=7),water_year:=year+1] # Southern hemisphere water year is July through June
-# site_clim_df <- site_clim_df %>% 
-#   as_tibble() %>% 
-#   select(-year) %>% 
-#   rename(year = water_year)
+# 4. Add water year
+ site_clim_df[,water_year:=year]
+ site_clim_df[(latitude>=0) & (month>=10),water_year:=year+1] # Northern hemisphere water year is october through september
+ site_clim_df[(latitude<0) & (month>=7),water_year:=year+1] # Southern hemisphere water year is July through June
+ site_clim_df <- site_clim_df %>% 
+   as_tibble() %>% 
+   select(-year) %>% 
+   rename(year = water_year)
 
-# 4. Calculate site-level annual climate
+# 5. Calculate site-level annual climate
 site_clim_df = site_clim_df %>%
   group_by(collection_id, year) %>%
   summarise(tc_cwd.an = sum(tc_cwd),
             tc_pet.an = sum(tc_pet),
             .groups = "drop")
-
-# 5. Load species information for sites
-site_smry <- read_csv(paste0(data_dir, 'site_summary.csv'))
-site_smry <- site_smry %>%
-  select(collection_id, sp_id) %>% 
-  mutate(location_id = collection_id) %>% 
-  mutate(sp_code = tolower(sp_id)) %>% 
-  select(-sp_id)
 
 
 ## NOTE: FIA data not included in replication data repository

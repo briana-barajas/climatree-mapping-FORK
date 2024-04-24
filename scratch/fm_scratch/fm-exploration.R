@@ -55,10 +55,10 @@ future::plan(multisession, workers = n_cores)
 data_dir <- "~/../../capstone/climatree/raw_data/"
 output_dir <- "~/../../capstone/climatree/output/1-process-raw-data/"
 
-essential <- read_csv(paste0(data_dir,"essentialcwd_data.csv"))
+site_summary <- read_csv(paste0(data_dir, 'HistoricCWD_AETGrids_Annual.Rdat'))
 # 1. Historic climate raster
-#clim_file <- paste0(data_dir, 'HistoricCWD_AETGrids_Annual.Rdat')
-#load(clim_file)
+clim_file <- paste0(data_dir, 'HistoricCWD_AETGrids_Annual.Rdat')
+load(clim_file)
 #cwd_historic <- mean(cwd_historic)
 #aet_historic <- mean(aet_historic)
 #pet_historic <- aet_historic + cwd_historic
@@ -80,11 +80,13 @@ essential <- read_csv(paste0(data_dir,"essentialcwd_data.csv"))
          #precip = ppt) 
 
 # 1. Add terraclimate raster data of historic climates
-cwd_tc <- rast(paste0(data_dir,"TerraClimate19611990_def.nc")) %>%
-  sum()
-pet_tc <- rast(paste0(data_dir,"TerraClimate19611990_pet.nc")) %>%
-  sum()
-clim_tc <- rast(list("cwd" = cwd_tc, "pet" = pet_tc))
+cwd_tc <- terra::rast(paste0(data_dir,"TerraClimate19611990_def.nc")) %>%
+  sum() %>% 
+  stack()
+pet_tc <- terra::rast(paste0(data_dir,"TerraClimate19611990_pet.nc")) %>%
+  sum() %>% 
+  stack()
+clim_tc <- terra::raster(list("cwd" = cwd_tc, "pet" = pet_tc))
 
 # 2. Add terraclimate site-month-year data
 tc_pet <- read_csv(paste0(data_dir,"itrdbsites_pet.csv"))
