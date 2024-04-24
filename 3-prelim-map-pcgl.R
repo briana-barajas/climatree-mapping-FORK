@@ -565,10 +565,9 @@ calc_rwi_partials <- function(sppp_code, cmip_id, sensitivity, cwd_const_sens, p
 }
 
 
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# Compute sensitivity, RWI for each species by MC combination ---------------
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+## =======================================================================
+## ------ compute sensitivity, RWI for each species by MC combination ----
+## =======================================================================
 pull_layer <- function(brick, layer_name){
   pulled_layer <- brick %>% subset(layer_name)
 }
@@ -773,6 +772,23 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
 # quantile(c(0.025, 0.5, 0.975))
 
 
+
+
+
+
+
+
+
+
+
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#
+#                               7 Plotting ----
+#
+#
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 
