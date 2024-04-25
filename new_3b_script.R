@@ -435,14 +435,14 @@ write_rds(sp_cmip_clim, paste0(output_dir, "sp_clim_predictions.", compress = "g
 # ===============================================================
 
 # Calculate site-level annual climate
-site_clim_df = site_clim_df %>%
-  group_by(collection_id, year) %>%
-  summarise(
+#site_clim_df = site_clim_df %>%
+  #group_by(collection_id, year) %>%
+  #summarise(
     #aet.an = sum(aet),
-    cwd.an = sum(cwd),
-    pet.an = sum(pet),#((aet+cwd)),
+    #cwd.an = sum(cwd),
+    #pet.an = sum(pet),#((aet+cwd)),
     #temp.an = mean(tmean),
-    .groups = "drop")
+    #.groups = "drop")
 
 ### Calculate site-level, average, historic, relative climate (for second stage)
 ## TODO: Note - dropping CANA323 because it has null climate data for a few months each year. might want to dig into this
@@ -481,9 +481,9 @@ spstd_site_clim_df <- spstd_site_clim_df %>%
                                  .options = furrr_options(packages = c( "dplyr"))))
 
 spstd_site_clim_df <- spstd_site_clim_df %>% 
-  #unnest(site_clim) %>% 
-  #rename(cwd.spstd = cwd.ave, 
-         #pet.spstd = pet.ave) %>%  
+  unnest(site_clim) %>% 
+  rename(cwd.spstd = cwd.ave, 
+         pet.spstd = pet.ave) %>%  
          #temp.spstd = temp.ave) %>% 
   mutate(cwd.sd = cwd.sd / cwd_sd,
          pet.sd = pet.sd / pet_sd) %>% 
@@ -533,13 +533,14 @@ an_site_clim_df <- an_site_clim_df %>%
 an_site_clim_df <- an_site_clim_df %>% 
   unnest(site_clim) %>% 
   rename(cwd.an.spstd = cwd.an, 
-         pet.an.spstd = pet.an) 
+         pet.an.spstd = pet.an) %>% 
          #temp.an.spstd = temp.an) %>% 
   ungroup() %>% 
   select(
     # -aet.an, 
     -pet_mean, 
     -pet_sd, -cwd_mean, -cwd_sd, -data, -sp_code) # removed -temp_mean and -temp_sd
+
 
 an_site_clim_df <- an_site_clim_df %>%
   select(-location_id)
