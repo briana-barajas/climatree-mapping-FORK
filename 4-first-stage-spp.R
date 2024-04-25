@@ -76,8 +76,8 @@ site_df <- site_df %>%
 
 # Merge back into main flm_df
 flm_df <- flm_df %>% 
-  left_join(site_df, by = "collection_id") %>% 
-  filter(species_id == "pial") #<<<<<<<<<<<<<<<<<<<------------ input desired species code(s) here to run script------------------------------
+  left_join(site_df, by = "collection_id") #%>% 
+  #filter(species_id == "pial") #<<<<<<<<<<<<<<<<<<<------------ input desired species code(s) here to run script------------------------------
 
 # define new folder to store outputs
 output_dir <- "~/../../capstone/climatree/output/test-output/"
