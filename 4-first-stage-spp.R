@@ -88,7 +88,7 @@ original_flm_df <- flm_df
 # define species_id column to iterate through for for loop
 spp_code_list <- flm_df$species_id
 
-# for loop for iterating script through all species
+# for loop for iterating through script for all species
 
 for(i in spp_code_list) {
   
@@ -514,7 +514,6 @@ n_mc <- 10000
 data_dir <- "~/../../capstone/climatree/raw_data/"
 output_dir1 <- "~/../../capstone/climatree/output/1-process-raw-data/"
 output_dir2 <- "~/../../capstone/climatree/output/test-output/"
-
 # Create output directories
 #out_dir <- paste0(wdir,"2_output/predictions/")
 # dir.create(file.path(out_dir), showWarnings = FALSE)
@@ -799,7 +798,7 @@ for (i in spp_code_list) {
     sp_predictions %>% 
       write_rds(paste0(output_dir2, "sp_rwi_", i, ".gz"), compress = "gz")
     
-   # toc()
+    #toc()
     #return(agg_stats)
   }
   
