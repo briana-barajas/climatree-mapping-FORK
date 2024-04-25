@@ -481,12 +481,12 @@ spstd_site_clim_df <- spstd_site_clim_df %>%
                                  .options = furrr_options(packages = c( "dplyr"))))
 
 spstd_site_clim_df <- spstd_site_clim_df %>% 
-  unnest(site_clim) %>% 
-  rename(cwd.spstd = cwd.ave, 
-         pet.spstd = pet.ave) 
+  #unnest(site_clim) %>% 
+  #rename(cwd.spstd = cwd.ave, 
+         #pet.spstd = pet.ave) %>%  
          #temp.spstd = temp.ave) %>% 
   mutate(cwd.sd = cwd.sd / cwd_sd,
-         pet.sd = pet.sd / pet_sd)
+         pet.sd = pet.sd / pet_sd) %>% 
          #temp.sd = temp.sd / temp_sd) %>% 
   ungroup() %>% 
   select(collection_id, location_id, cwd.spstd, 
