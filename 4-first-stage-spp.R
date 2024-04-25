@@ -76,8 +76,8 @@ site_df <- site_df %>%
 
 # Merge back into main flm_df
 flm_df <- flm_df %>% 
-  left_join(site_df, by = "collection_id") #%>% 
-  #filter(species_id == "pial") #<<<<<<<<<<<<<<<<<<<------------ input desired species code(s) here to run script------------------------------
+  left_join(site_df, by = "collection_id") %>% 
+  filter(species_id == "pcgl") #<<<<<<<<<<<<<<<<<<<------------ input desired species code(s) here to run script------------------------------
 
 # define new folder to store outputs
 output_dir <- "~/../../capstone/climatree/output/test-output/"
@@ -513,7 +513,7 @@ n_mc <- 10000
 # Define path
 data_dir <- "~/../../capstone/climatree/raw_data/"
 output_dir1 <- "~/../../capstone/climatree/output/1-process-raw-data/"
-# ouput_dir2 <- wherever the saved files from the first script are stored 
+output_dir2 <- "~/../../capstone/climatree/output/test-output/"
 
 # Create output directories
 #out_dir <- paste0(wdir,"2_output/predictions/")
@@ -799,8 +799,8 @@ for (i in spp_code_list) {
     sp_predictions %>% 
       write_rds(paste0(output_dir2, "sp_rwi_", i, ".gz"), compress = "gz")
     
-    toc()
-    return(agg_stats)
+   # toc()
+    #return(agg_stats)
   }
   
 }
