@@ -66,7 +66,7 @@ site_df <- site_df %>%
   mutate(species_id = str_to_lower(species_id))
 
  # 4. Species information
- sp_info <- read_csv(paste0(data_dir, 'species_metadata'))
+ sp_info <- read_csv(paste0(data_dir, 'species_metadata.csv'))
  sp_info <- sp_info %>% 
    select(species_id, genus, gymno_angio, family)
  site_df <- site_df %>% 
@@ -78,7 +78,7 @@ flm_df <- flm_df %>%
 
 # filter for pcgl
 flm_df <- flm_df %>% 
-  filter(species_code == "pcgl")
+  filter(species_id == "pcgl")
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Prep and trim data -----------------------------------------------------
@@ -114,7 +114,7 @@ flm_df <- flm_df %>%
            (estimate_pet.an>pet_est_bounds[2]))
 
 # Save out full flm_df to simplify downstream scripts and ensure consistency
-flm_df %>% write.csv(paste0(output_dir, "site_pet_cwd_std_augmented.csv"))
+flm_df %>% write.csv(paste0(output_dir, "site_pet_cwd_std_augmented_pcgl_test.csv"))
 
 # Trim outliers
 trim_df <- flm_df %>% 
@@ -328,9 +328,9 @@ block_draw_df <- block_draw_df %>%
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Export first stage draws to pull summary stats -------------------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-block_draw_df %>% 
+#block_draw_df %>% 
   # select(boot_id, collection_id, cwd_coef, pet_coef, int_coef, cwd.spstd, pet.spstd) %>% 
-  write_rds(paste0(output_dir, "mc_sample.gz"), compress = "gz")
+  #write_rds(paste0(output_dir, "mc_sample.gz"), compress = "gz")
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -415,7 +415,7 @@ boot_df <- boot_df %>%
 
 
 ## Save out bootstrapped coefficients
-write_rds(boot_df, paste0(output_dir, "ss_bootstrap.rds"))
+write_rds(boot_df, paste0(output_dir, "ss_bootstrap_pcgl_test.rds"))
 
 
 
@@ -498,16 +498,17 @@ output_dir <- "~/../../capstone/climatree/output/1-process-raw-data/"
 # Create output directories
 #out_dir <- paste0(wdir,"2_output/predictions/")
 # dir.create(file.path(out_dir), showWarnings = FALSE)
-dir.create(file.path(paste0(output_dir, "sp_rwi/")), showWarnings = FALSE)
+#dir.create(file.path(paste0(output_dir, "sp_rwi/")), showWarnings = FALSE)
 # dir.create(file.path(paste0(out_dir, "sp_hot_cells/")), showWarnings = FALSE)
 
 # 1. Second stage model
-mod_df <- read_rds(paste0(output_dir, "ss_bootstrap.rds"))
+mod_df <- read_rds(paste0(output_dir, "ss_bootstrap_pcgl_test.rds"))
 mod_df <- mod_df %>% 
   rename(iter_idx = boot_id)
 
 # 2. Species-standardized historic and future climate
-sp_clim <- read_rds(paste0(output_dir, "sp_clim_predictions.gz"))
+sp_clim <- read_rds(paste0(output_dir, "sp_clim_predictions.gz")) %>% 
+  filter(sp_code == "pcgl")
 species_list <- sp_clim %>% select(sp_code)
 
 
@@ -832,51 +833,51 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
   
   ## Write out
   sp_predictions %>% 
-    write_rds(file = paste0(output_dir, "sp_rwi/", spp_code, ".gz"), compress = "gz")
+    write_rds(file = paste0(output_dir, "sp_rwi_pcgl_test.gz"), compress = "gz")
   
   toc()
   return(agg_stats)
 }
 
 
-mc_nests <- sp_mc %>%
-  group_by(sp_code) %>%
-  nest() %>% 
-  drop_na()
+ mc_nests <- sp_mc %>%
+   group_by(sp_code) %>%
+   nest() %>% 
+   drop_na()
 
 # Generally have memory issues with 38 (LAGM), and 93 (PISY) - need to run these with two cores
-# large_range_sp <- c("lagm", "pisy")
-# spp_code = "abal"
-# mc_data = mc_nests %>% filter(sp_code == spp_code) %>% pull(data)
-# mc_data = mc_data[[1]]
-# parallel = FALSE
+ # large_range_sp <- c("lagm", "pisy")
+ # spp_code = "abal"
+ # mc_data = mc_nests %>% filter(sp_code == spp_code) %>% pull(data)
+ # mc_data = mc_data[[1]]
+ # parallel = FALSE
+ # 
+ # mc_nests_large <- mc_nests %>% 
+ #   filter((sp_code %in% large_range_sp)) %>% 
+ #   mutate(predictions = pmap(list(spp_code = sp_code,
+ #                                  mc_data = data,
+ #                                  parallel = TRUE),
+ #                             .f = calc_rwi_quantiles))
 
-# mc_nests_large <- mc_nests %>% 
-#   filter((sp_code %in% large_range_sp)) %>% 
-#   mutate(predictions = pmap(list(spp_code = sp_code,
-#                                  mc_data = data,
-#                                  parallel = TRUE),
-#                             .f = calc_rwi_quantiles))
-
-mc_nests_small <- mc_nests %>% 
-  # filter(!(sp_code %in% large_range_sp)) %>% 
-  mutate(predictions = pmap(list(spp_code = sp_code,
-                                 mc_data = data,
-                                 parallel = TRUE),
-                            .f = calc_rwi_quantiles)) 
-
-agg_stats <- mc_nests_small %>% 
-  select(-data) %>% 
-  unnest(predictions) %>% 
-  write_rds(file = paste0(output_dir, "mc_agg_stats.gz"), compress = "gz")
-
-
-test <- agg_stats %>% 
-  group_by(iter_idx) %>% 
-  summarise(rwi_pred_change = mean(rwi_pred_change))
-test %>%
-  pull(rwi_pred_change) %>% 
-  quantile(c(0.025, 0.5, 0.975))
+ mc_nests_small <- mc_nests %>% 
+   # filter(!(sp_code %in% large_range_sp)) %>% 
+   mutate(predictions = pmap(list(spp_code = sp_code,
+                                  mc_data = data,
+                                  parallel = TRUE),
+                             .f = calc_rwi_quantiles)) 
+ 
+ agg_stats <- mc_nests_small %>% 
+   select(-data) %>% 
+   unnest(predictions) %>% 
+   write_rds(file = paste0(output_dir, "mc_agg_stats_pcgl_test.gz"), compress = "gz")
+ 
+ 
+ test <- agg_stats %>% 
+   group_by(iter_idx) %>% 
+   summarise(rwi_pred_change = mean(rwi_pred_change))
+ test %>%
+   pull(rwi_pred_change) %>% 
+   quantile(c(0.025, 0.5, 0.975))
 
 
 
@@ -1069,7 +1070,7 @@ test %>%
 
 
 
-6 
+7
 ###############################################################################
 ###############################################################################
 ###############################################################################
@@ -1079,7 +1080,7 @@ test %>%
 ###############################################################################
 ###############################################################################
 ###############################################################################
-6 
+7
 
 
 
@@ -1135,7 +1136,6 @@ data_dir <- "~/../../capstone/climatree/raw_data/"
 output_dir <- "~/../../capstone/climatree/output/1-process-raw-data/"
 
 
-for(i in spp_code_list) {
   
   # 1. Site-level regressions
   flm_df <- read_csv(paste0(output_dir, "site_pet_cwd_std_augmented_", i, ".csv")) 
