@@ -114,7 +114,7 @@ flm_df <- flm_df %>%
            (estimate_pet.an>pet_est_bounds[2]))
 
 # Save out full flm_df to simplify downstream scripts and ensure consistency
-flm_df %>% write.csv(paste0(output_dir, "site_pet_cwd_std_augmented_pcgl_test.csv"))
+flm_df %>% write.csv(paste0(output_dir, "site_pet_cwd_std_augmented_pcgl_new.csv"))
 
 # Trim outliers
 trim_df <- flm_df %>% 
@@ -415,7 +415,7 @@ boot_df <- boot_df %>%
 
 
 ## Save out bootstrapped coefficients
-write_rds(boot_df, paste0(output_dir, "ss_bootstrap_pcgl_test.rds"))
+write_rds(boot_df, paste0(output_dir, "ss_bootstrap_pcgl_new.rds"))
 
 
 
@@ -502,7 +502,7 @@ output_dir <- "~/../../capstone/climatree/output/1-process-raw-data/"
 # dir.create(file.path(paste0(out_dir, "sp_hot_cells/")), showWarnings = FALSE)
 
 # 1. Second stage model
-mod_df <- read_rds(paste0(output_dir, "ss_bootstrap_pcgl_test.rds"))
+mod_df <- read_rds(paste0(output_dir, "ss_bootstrap_pcgl_new.rds"))
 mod_df <- mod_df %>% 
   rename(iter_idx = boot_id)
 
@@ -865,6 +865,8 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
                                   mc_data = data,
                                   parallel = TRUE),
                              .f = calc_rwi_quantiles)) 
+ 
+
  
  agg_stats <- mc_nests_small %>% 
    select(-data) %>% 

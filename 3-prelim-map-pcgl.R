@@ -48,13 +48,13 @@ n_mc <- 10000
 ## =======================================================================
 ### Define path
 data_dir <- "~/../../capstone/climatree/raw_data/"
-output_dir <- "~/../../capstone/climatree/output/1-process-raw-data/"
+output_dir <- "~/../../capstone/climatree/output/test-output/"
 
 # 1. Site-level regressions
-flm_df <- read_csv(paste0(output_dir, 'site_pet_cwd_std.csv'))
+flm_df <- read_csv(paste0(output_dir, 'site_pet_cwd_std_old.csv'))
 
 # 2. Historic site-level climate
-ave_site_clim <- read_rds(paste0(output_dir, "site_ave_clim.gz"))
+ave_site_clim <- read_rds(paste0(output_dir, "site_ave_clim_old.gz"))
 flm_df <- flm_df %>% 
   left_join(ave_site_clim, by = c("collection_id"))
 
@@ -73,18 +73,17 @@ sp_info <- sp_info %>%
 site_df <- site_df %>% 
   left_join(sp_info, by = "species_id")
 
-## =======================================================================
-## ------------------------ prep and trim data ---------------------------
-## =======================================================================
-
 # Merge back into main flm_df
 flm_df <- flm_df %>% 
   left_join(site_df, by = "collection_id")
 
-
-# Filter for species code pcgl (White Spruce)
 flm_df <- flm_df %>% 
   filter(species_id == "pcgl")
+
+## =======================================================================
+## ------------------------ prep and trim data ---------------------------
+## =======================================================================
+
 
 # Add weighting based on inverse of first stage variance
 flm_df <- flm_df %>% 
@@ -131,59 +130,59 @@ vg.range = vg.fit[2,3] * 1000
 ## =======================================================================
 ## ------------------ quick test of primary regression -----------------
 ## =======================================================================
-formula = as.formula("estimate_cwd.an ~ cwd.spstd + (cwd.spstd^2) + pet.spstd + (pet.spstd^2)")
-mod_data <- trim_df
-cwd_mod <- feols(formula, data = mod_data, weights = mod_data$cwd_errorweights,
-                 vcov = conley(cutoff = vg.range/1000, distance = "spherical"))
-summary(cwd_mod)
-
-marg_fx_df <- function(mod){
-  inc <- 0.1
-  min <- -2.5
-  max <- 2.5
-  cwd_pred <- predictions(mod, newdata = datagrid(pet.spstd = 0, cwd.spstd = seq(min,max,inc))) %>% 
-    mutate(variation = "cwd")
-  pet_pred <- predictions(mod, newdata = datagrid(pet.spstd = seq(min,max,inc), cwd.spstd = 0)) %>% 
-    mutate(variation = "pet")
-  return(rbind(cwd_pred, pet_pred))
-}
-
-
-preds <- marg_fx_df(cwd_mod)
-
-cwd_mfx_plot <- preds %>% 
-  filter(variation == "cwd") %>% 
-  ggplot(aes(x = cwd.spstd)) + 
-  geom_line(aes(y = estimate)) +
-  geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
-cwd_mfx_plot
-
-pet_mfx_plot <- preds %>% 
-  filter(variation == "pet") %>% 
-  ggplot(aes(x = pet.spstd)) + 
-  geom_line(aes(y = estimate)) +
-  geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
-pet_mfx_plot
-
-formula = as.formula("estimate_pet.an ~ cwd.spstd + pet.spstd + (cwd.spstd^2) + (pet.spstd^2)")
-pet_mod <- feols(formula, weights = mod_data$pet_errorweights, data = mod_data,
-                 vcov = conley(cutoff = vg.range/1000, distance = "spherical"))
-summary(pet_mod)
-preds <- marg_fx_df(pet_mod)
-
-cwd_mfx_plot <- preds %>% 
-  filter(variation == "cwd") %>% 
-  ggplot(aes(x = cwd.spstd)) + 
-  geom_line(aes(y = estimate)) +
-  geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
-cwd_mfx_plot
-
-pet_mfx_plot <- preds %>% 
-  filter(variation == "pet") %>% 
-  ggplot(aes(x = pet.spstd)) + 
-  geom_line(aes(y = estimate)) +
-  geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
-pet_mfx_plot
+# formula = as.formula("estimate_cwd.an ~ cwd.spstd + (cwd.spstd^2) + pet.spstd + (pet.spstd^2)")
+# mod_data <- trim_df
+# cwd_mod <- feols(formula, data = mod_data, weights = mod_data$cwd_errorweights,
+#                  vcov = conley(cutoff = vg.range/1000, distance = "spherical"))
+# summary(cwd_mod)
+# 
+# marg_fx_df <- function(mod){
+#   inc <- 0.1
+#   min <- -2.5
+#   max <- 2.5
+#   cwd_pred <- predictions(mod, newdata = datagrid(pet.spstd = 0, cwd.spstd = seq(min,max,inc))) %>% 
+#     mutate(variation = "cwd")
+#   pet_pred <- predictions(mod, newdata = datagrid(pet.spstd = seq(min,max,inc), cwd.spstd = 0)) %>% 
+#     mutate(variation = "pet")
+#   return(rbind(cwd_pred, pet_pred))
+# }
+# 
+# 
+# preds <- marg_fx_df(cwd_mod)
+# 
+# cwd_mfx_plot <- preds %>% 
+#   filter(variation == "cwd") %>% 
+#   ggplot(aes(x = cwd.spstd)) + 
+#   geom_line(aes(y = estimate)) +
+#   geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
+# cwd_mfx_plot
+# 
+# pet_mfx_plot <- preds %>% 
+#   filter(variation == "pet") %>% 
+#   ggplot(aes(x = pet.spstd)) + 
+#   geom_line(aes(y = estimate)) +
+#   geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
+# pet_mfx_plot
+# 
+# formula = as.formula("estimate_pet.an ~ cwd.spstd + pet.spstd + (cwd.spstd^2) + (pet.spstd^2)")
+# pet_mod <- feols(formula, weights = mod_data$pet_errorweights, data = mod_data,
+#                  vcov = conley(cutoff = vg.range/1000, distance = "spherical"))
+# summary(pet_mod)
+# preds <- marg_fx_df(pet_mod)
+# 
+# cwd_mfx_plot <- preds %>% 
+#   filter(variation == "cwd") %>% 
+#   ggplot(aes(x = cwd.spstd)) + 
+#   geom_line(aes(y = estimate)) +
+#   geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
+# cwd_mfx_plot
+# 
+# pet_mfx_plot <- preds %>% 
+#   filter(variation == "pet") %>% 
+#   ggplot(aes(x = pet.spstd)) + 
+#   geom_line(aes(y = estimate)) +
+#   geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
+# pet_mfx_plot
 
 ## =======================================================================
 ## -------------- identify spatially proximate blocks of sites -----------
@@ -742,30 +741,30 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
   return(agg_stats)
 }
 
-#mc_nests <- sp_mc %>%
-#group_by(sp_code) %>%
-#nest() %>% 
-#drop_na()
+mc_nests <- sp_mc %>%
+group_by(sp_code) %>%
+nest() %>% 
+drop_na()
 
-#mc_nests_small <- mc_nests %>% 
-# filter(!(sp_code %in% large_range_sp)) %>% 
-#mutate(predictions = pmap(list(spp_code = sp_code,
-#                              mc_data = data,
-#                             parallel = TRUE),
-#                         .f = calc_rwi_quantiles)) 
+mc_nests_small <- mc_nests %>% 
+ #filter(!(sp_code %in% large_range_sp)) %>% 
+mutate(predictions = pmap(list(spp_code = sp_code,
+                              mc_data = data,
+                             parallel = TRUE),
+                         .f = calc_rwi_quantiles)) 
 
-#agg_stats <- mc_nests_small %>% 
-# select(-data) %>% 
-#unnest(predictions) #%>% 
-#write_rds(file = paste0(output_dir, "mc_agg_stats_pcgl.gz"), compress = "gz")
+agg_stats <- mc_nests_small %>% 
+ select(-data) %>% 
+unnest(predictions) #%>% 
+write_rds(file = paste0(output_dir, "mc_agg_stats_pcgl.gz"), compress = "gz")
 
 
-#test <- agg_stats %>% 
-# group_by(iter_idx) %>% 
-#summarise(rwi_pred_change = mean(rwi_pred_change))
-#test %>%
-# pull(rwi_pred_change) %>% 
-# quantile(c(0.025, 0.5, 0.975))
+test <- agg_stats %>% 
+ group_by(iter_idx) %>% 
+summarise(rwi_pred_change = mean(rwi_pred_change))
+test %>%
+ pull(rwi_pred_change) %>% 
+ quantile(c(0.025, 0.5, 0.975))
 
 
 
