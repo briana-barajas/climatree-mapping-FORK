@@ -135,7 +135,7 @@ flm_df <- flm_df %>%
            (estimate_pet.an>pet_est_bounds[2]))
 
 # Save out full flm_df to simplify downstream scripts and ensure consistency
-flm_df %>% write.csv(paste0(output_dir, "site_pet_cwd_std_augmented.csv"))
+flm_df %>% write.csv(paste0(output_dir, "site_pet_cwd_std_augmented_pcgl_old.csv"))
 
 # Trim outliers
 trim_df <- flm_df %>% 
@@ -159,59 +159,59 @@ vg.range = vg.fit[2,3] * 1000
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Quick test of primary regression ---------------------------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# formula = as.formula("estimate_cwd.an ~ cwd.spstd + (cwd.spstd^2) + pet.spstd + (pet.spstd^2)")
-# mod_data <- trim_df
-# cwd_mod <- feols(formula, data = mod_data, weights = mod_data$cwd_errorweights,
-#                  vcov = conley(cutoff = vg.range/1000, distance = "spherical"))
-# summary(cwd_mod)
-# 
-# marg_fx_df <- function(mod){
-#   inc <- 0.1
-#   min <- -2.5
-#   max <- 2.5
-#   cwd_pred <- predictions(mod, newdata = datagrid(pet.spstd = 0, cwd.spstd = seq(min,max,inc))) %>% 
-#     mutate(variation = "cwd")
-#   pet_pred <- predictions(mod, newdata = datagrid(pet.spstd = seq(min,max,inc), cwd.spstd = 0)) %>% 
-#     mutate(variation = "pet")
-#   return(rbind(cwd_pred, pet_pred))
-# }
-# 
-# 
-# preds <- marg_fx_df(cwd_mod)
-# 
-# cwd_mfx_plot <- preds %>% 
-#   filter(variation == "cwd") %>% 
-#   ggplot(aes(x = cwd.spstd)) + 
-#   geom_line(aes(y = estimate)) +
-#   geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
-# cwd_mfx_plot
-# 
-# pet_mfx_plot <- preds %>% 
-#   filter(variation == "pet") %>% 
-#   ggplot(aes(x = pet.spstd)) + 
-#   geom_line(aes(y = estimate)) +
-#   geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
-# pet_mfx_plot
-# 
-# formula = as.formula("estimate_pet.an ~ cwd.spstd + pet.spstd + (cwd.spstd^2) + (pet.spstd^2)")
-# pet_mod <- feols(formula, weights = mod_data$pet_errorweights, data = mod_data,
-#                  vcov = conley(cutoff = vg.range/1000, distance = "spherical"))
-# summary(pet_mod)
-# preds <- marg_fx_df(pet_mod)
-# 
-# cwd_mfx_plot <- preds %>% 
-#   filter(variation == "cwd") %>% 
-#   ggplot(aes(x = cwd.spstd)) + 
-#   geom_line(aes(y = estimate)) +
-#   geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
-# cwd_mfx_plot
-# 
-# pet_mfx_plot <- preds %>% 
-#   filter(variation == "pet") %>% 
-#   ggplot(aes(x = pet.spstd)) + 
-#   geom_line(aes(y = estimate)) +
-#   geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
-# pet_mfx_plot
+formula = as.formula("estimate_cwd.an ~ cwd.spstd + (cwd.spstd^2) + pet.spstd + (pet.spstd^2)")
+mod_data <- trim_df
+cwd_mod <- feols(formula, data = mod_data, weights = mod_data$cwd_errorweights,
+                 vcov = conley(cutoff = vg.range/1000, distance = "spherical"))
+summary(cwd_mod)
+
+marg_fx_df <- function(mod){
+  inc <- 0.1
+  min <- -2.5
+  max <- 2.5
+  cwd_pred <- predictions(mod, newdata = datagrid(pet.spstd = 0, cwd.spstd = seq(min,max,inc))) %>% 
+    mutate(variation = "cwd")
+  pet_pred <- predictions(mod, newdata = datagrid(pet.spstd = seq(min,max,inc), cwd.spstd = 0)) %>% 
+    mutate(variation = "pet")
+  return(rbind(cwd_pred, pet_pred))
+}
+
+
+preds <- marg_fx_df(cwd_mod)
+
+cwd_mfx_plot <- preds %>% 
+  filter(variation == "cwd") %>% 
+  ggplot(aes(x = cwd.spstd)) + 
+  geom_line(aes(y = estimate)) +
+  geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
+cwd_mfx_plot
+
+pet_mfx_plot <- preds %>% 
+  filter(variation == "pet") %>% 
+  ggplot(aes(x = pet.spstd)) + 
+  geom_line(aes(y = estimate)) +
+  geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
+pet_mfx_plot
+
+formula = as.formula("estimate_pet.an ~ cwd.spstd + pet.spstd + (cwd.spstd^2) + (pet.spstd^2)")
+pet_mod <- feols(formula, weights = mod_data$pet_errorweights, data = mod_data,
+                 vcov = conley(cutoff = vg.range/1000, distance = "spherical"))
+summary(pet_mod)
+preds <- marg_fx_df(pet_mod)
+
+cwd_mfx_plot <- preds %>% 
+  filter(variation == "cwd") %>% 
+  ggplot(aes(x = cwd.spstd)) + 
+  geom_line(aes(y = estimate)) +
+  geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
+cwd_mfx_plot
+
+pet_mfx_plot <- preds %>% 
+  filter(variation == "pet") %>% 
+  ggplot(aes(x = pet.spstd)) + 
+  geom_line(aes(y = estimate)) +
+  geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.2)
+pet_mfx_plot
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Identify spatially proximate blocks of sites ---------------------------------
@@ -246,7 +246,7 @@ for (site in site_list){
     pull(collection_id)
   block_list[site] <- list(block_sites)
 }
-save(block_list,file=paste0(output_dir,"spatial_blocks.Rdat"))
+save(block_list,file=paste0(output_dir,"spatial_blocks_old.Rdat"))
 # load(file=paste0(wdir,"out/second_stage/spatial_blocks.Rdat"))
 
 
@@ -349,9 +349,9 @@ block_draw_df <- block_draw_df %>%
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Export first stage draws to pull summary stats -------------------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# block_draw_df %>% 
-#   # select(boot_id, collection_id, cwd_coef, pet_coef, int_coef, cwd.spstd, pet.spstd) %>% 
-#   write_rds(paste0(output_dir, "mc_sample.gz"), compress = "gz")
+ block_draw_df %>% 
+  select(boot_id, collection_id, cwd_coef, pet_coef, int_coef, cwd.spstd, pet.spstd) %>% 
+  write_rds(paste0(output_dir, "mc_sample_pcgl_old.gz"), compress = "gz")
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -436,7 +436,7 @@ boot_df <- boot_df %>%
 
 
 ## Save out bootstrapped coefficients
-write_rds(boot_df, paste0(output_dir, "ss_bootstrap_old.rds"))
+write_rds(boot_df, paste0(output_dir, "ss_bootstrap_pcgl_old.rds"))
 
 
 
@@ -1173,8 +1173,6 @@ output_dir <- "~/../../capstone/climatree/output/old-output/"
   
   # 3. Site information
   site_smry <- read_csv(paste0(data_dir, 'site_summary.csv'))
-  species_metadata <- read_csv(paste0(data_dir, 'species_metadata.csv'))
-  
   site_smry <- site_smry %>% 
     select(collection_id, sp_id, latitude, longitude) %>% 
     mutate(species_id = tolower(sp_id)) %>% 
@@ -1192,9 +1190,8 @@ output_dir <- "~/../../capstone/climatree/output/old-output/"
   #   left_join(sp_info, by = c("species_id"))
   
   # 5. Prediction rasters
-  #rwi_list <- list.files(paste0(output_dir, "sp_rwi/"), pattern = ".gz", full.names = TRUE)
-  #sp_predictions <- do.call('rbind', lapply(rwi_list, readRDS))
-  sp_predictions <- read_rds(paste0(output_dir, "sp_rwi_pcgl_old.gz"))
+  rwi_list <- list.files(paste0(output_dir, "sp_rwi_pcgl_old"), pattern = ".gz", full.names = TRUE)
+  sp_predictions <- do.call('rbind', lapply(rwi_list, readRDS))
   
   # 6. Dendro examples - note: exporting two pipo sites in first stage script
   #dendro_ex <- read_csv(paste0(output_dir, "example_sites.csv"))
@@ -1243,43 +1240,42 @@ output_dir <- "~/../../capstone/climatree/output/old-output/"
   # Define example sites  ---------
   #===============================================================================
   # Pull relevant ITRDB sites
-  #trim_df <- trim_df %>%
-  #drop_na() %>%
-  #st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+  trim_df <- trim_df %>%
+    drop_na() %>%
+    st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
   
-  #high_sens = "CO559"
-  #low_sens = "CA585"
+  high_sens = "CO559"
+  low_sens = "CA585"
   
-  #high_coords <- trim_df %>% 
-  #filter(collection_id == high_sens) %>% 
-  #pull(geometry)
-  #low_coords <- trim_df %>% 
-  #filter(collection_id == low_sens) %>% 
-  #pull(geometry)
+  high_coords <- trim_df %>% 
+    filter(collection_id == high_sens) %>% 
+    pull(geometry)
+  low_coords <- trim_df %>% 
+    filter(collection_id == low_sens) %>% 
+    pull(geometry)
   
-  #high_val <- trim_df %>% 
-  #filter(collection_id == high_sens) %>% 
-  #pull(estimate_cwd.an) %>% 
-  #round(digits = 3)
+  high_val <- trim_df %>% 
+    filter(collection_id == high_sens) %>% 
+    pull(estimate_cwd.an) %>% 
+    round(digits = 3)
   
-  #low_val <- trim_df %>% 
-  #filter(collection_id == low_sens) %>% 
-  #pull(estimate_cwd.an) %>% 
-  #round(digits = 3)
+  low_val <- trim_df %>% 
+    filter(collection_id == low_sens) %>% 
+    pull(estimate_cwd.an) %>% 
+    round(digits = 3)
   
   
-  #high_fs <- trim_df %>% filter(collection_id == high_sens)
-  #low_fs <- trim_df %>% filter(collection_id == low_sens)
+  high_fs <- trim_df %>% filter(collection_id == high_sens)
+  low_fs <- trim_df %>% filter(collection_id == low_sens)
   
-  #high_lab <- paste0("sensitivity = ", as.character(high_val))
-  #low_lab <- paste0("sensitivity = ", as.character(low_val))
+  high_lab <- paste0("sensitivity = ", as.character(high_val))
+  low_lab <- paste0("sensitivity = ", as.character(low_val))
   
-  #high_color <- "#404788"
-  #low_color <- "#efca2a"
-  #low_color <- "#1b9e77"
-  
-  #440154FF
-  
+  high_color <- "#404788"
+    low_color <- "#efca2a"
+      low_color <- "#1b9e77"
+        
+      #440154FF
   #===============================================================================
   # Step 1: data and detrending  ---------
   #===============================================================================
@@ -1302,8 +1298,8 @@ output_dir <- "~/../../capstone/climatree/output/old-output/"
   #===============================================================================
   spp_predictions <- spp_predictions %>% filter(abs(cwd_hist) < 2)  ## TODO - Figure out correct cut-off for predictions
   
-  spp_predictions <- spp_predictions %>%
-    select(x, y, cwd_sens, rwi_pred_change_mean)
+  #spp_predictions <- spp_predictions %>%
+    #select(x, y, cwd_sens, rwi_pred_change_mean)
   
   # create rasters for each species to save
   # v <- vect(spp_predictions, geom = c("x", "y"), crs = "EPSG:4326")
@@ -1312,7 +1308,7 @@ output_dir <- "~/../../capstone/climatree/output/old-output/"
   
   
   # save final tables in new final_output directory
-  write_rds(spp_predictions, paste0(output_dir, "spp_predictions_pcgl_old.rds"))
+  #write_rds(spp_predictions, paste0(output_dir, "spp_predictions_pcgl_old.rds"))
   
   ### Map of CWD sensitivity
   cwd_sens_map <- ggplot() +

@@ -38,6 +38,8 @@ library(raster)
 library(readr)
 library(tmap)
 library(tictoc)
+library(terra)
+library(data.table)
 select <- dplyr::select
 
 
@@ -51,38 +53,86 @@ future::plan(multisession, workers = n_cores)
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Define path
 data_dir <- "~/../../capstone/climatree/raw_data/"
-output_dir <- "~/../../capstone/climatree/output/old-output/"
+output_dir <- "~/../../capstone/climatree/output/new-output/"
 
 # 1. Historic climate raster
-clim_file <- paste0(data_dir, 'HistoricCWD_AETGrids_Annual.Rdat')
-load(clim_file)
-cwd_historic <- mean(cwd_historic)
-aet_historic <- mean(aet_historic)
-pet_historic <- aet_historic + cwd_historic
-names(cwd_historic) = "cwd"
-names(pet_historic) = "pet"
+# clim_file <- paste0(data_dir, 'HistoricCWD_AETGrids_Annual.Rdat')
+# load(clim_file)
+# cwd_historic <- mean(cwd_historic)
+# aet_historic <- mean(aet_historic)
+# pet_historic <- aet_historic + cwd_historic
+# names(cwd_historic) = "cwd"
+# names(pet_historic) = "pet"
+# 
+# # 2. Data on historic baseline temp and precip
+# temps_historic <- raster(paste0(data_dir, "monthlycrubaseline_tas"))
+# names(temps_historic) = "temp"
+# temps_historic <- resample(temps_historic, cwd_historic)
+# clim_historic <- raster::brick(list(cwd_historic, pet_historic, temps_historic))
+# 
+# # 3. Site-specific historic climate data
+# site_clim_csv <- paste0(data_dir, 'essentialcwd_data.csv')
+# site_clim_df <- read_csv(site_clim_csv)
+# site_clim_df <- site_clim_df %>% 
+#   mutate("site_id" = as.character(site)) %>% 
+#   rename(location_id = site_id)#,
+# # precip = ppt) 
 
-# 2. Data on historic baseline temp and precip
-temps_historic <- raster(paste0(data_dir, "monthlycrubaseline_tas"))
-names(temps_historic) = "temp"
-temps_historic <- resample(temps_historic, cwd_historic)
-clim_historic <- raster::brick(list(cwd_historic, pet_historic, temps_historic))
+# 1. Add terraclimate raster data of historic climates
+cwd_tc <- rast(paste0(data_dir,"TerraClimate19611990_def.nc")) %>%
+  sum()
+pet_tc <- rast(paste0(data_dir,"TerraClimate19611990_pet.nc")) %>%
+  sum()
+clim_tc <- rast(list("cwd" = cwd_tc, "pet" = pet_tc))
 
-# 3. Site-specific historic climate data
-site_clim_csv <- paste0(data_dir, 'essentialcwd_data.csv')
-site_clim_df <- read_csv(site_clim_csv)
-site_clim_df <- site_clim_df %>% 
-  mutate("site_id" = as.character(site)) %>% 
-  rename(location_id = site_id)#,
-        # precip = ppt) 
+# load species information for sites (for join)
+site_smry <- read_csv(paste0(data_dir, 'site_summary.csv')) %>% 
+  select(latitude, collection_id)
 
-# 4. Load species information for sites
+# 2. Add terraclimate site-month-year data
+tc_pet <- read_csv(paste0(data_dir,"itrdbsites_pet.csv"))
+tc_cwd <- read_csv(paste0(data_dir,"itrdbsites_def.csv"))
+site_clim_df <- tc_pet %>%
+  left_join(tc_cwd, by = c("collection_id", "Month", "year")) %>%
+  rename(month = Month,
+         pet = pet,
+         cwd = def) %>% 
+  left_join(site_smry, by = "collection_id")
+
+# 3. Load species information for sites
 site_smry <- read_csv(paste0(data_dir, 'site_summary.csv'))
 site_smry <- site_smry %>%
-  select(collection_id, sp_id) %>% 
+  select(collection_id, sp_id, latitude) %>% 
   mutate(location_id = collection_id) %>% 
   mutate(sp_code = tolower(sp_id)) %>% 
   select(-sp_id)
+
+# convert site_clim_df to data table for calculation below
+setDT(site_clim_df)
+
+# 4. Add water year
+site_clim_df[,water_year:=year]
+site_clim_df[(latitude>=0) & (month>=10),water_year:=year+1] # Northern hemisphere water year is october through september
+site_clim_df[(latitude<0) & (month>=7),water_year:=year+1] # Southern hemisphere water year is July through June
+site_clim_df <- site_clim_df %>% 
+  as_tibble() %>% 
+  select(-year) %>% 
+  rename(year = water_year)
+
+# 5. Calculate site-level annual climate
+site_clim_df = site_clim_df %>%
+  group_by(collection_id, year) %>%
+  summarise(cwd.an = sum(cwd),
+            pet.an = sum(pet),
+            .groups = "drop")
+
+# # 4. Load species information for sites
+# site_smry <- read_csv(paste0(data_dir, 'site_summary.csv'))
+# site_smry <- site_smry %>%
+#   select(collection_id, sp_id) %>% 
+#   mutate(location_id = collection_id) %>% 
+#   mutate(sp_code = tolower(sp_id)) %>% 
+#   select(-sp_id)
 
 
 ## NOTE: FIA data not included in replication data repository
@@ -94,11 +144,11 @@ site_smry <- site_smry %>%
 # site_smry <- rbind(site_smry, site_smry_fia)
 
 
-# 5. Species range maps
+# 6. Species range maps
 range_file <- paste0(data_dir, 'merged_ranges_dissolve.shp')
 range_sf <- st_read(range_file)
 
-# 6. Climate projections from CMIP5
+# 7. Climate projections from CMIP5
 cmip_end <- load(paste0(data_dir, 'cmip5_cwdaet_end.Rdat'))
 pet_cmip_end <- aet_raster + cwd_raster
 cwd_cmip_end <- cwd_raster
@@ -128,38 +178,54 @@ rm(aet_raster)
 # Summarize species niches -----------------------------------------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Pull and organize climate distribution for species
-pull_clim <- function(spp_code){
+# pull_clim <- function(spp_code){
+#   print(spp_code)
+#   # Pull relevant range map
+#   sp_range <- range_sf %>%
+#     filter(sp_code == spp_code) %>% 
+#     rasterize(cwd_historic, getCover=TRUE)
+#   sp_range[sp_range==0] <- NA
+#   
+#   # Pull cwd and aet values
+#   cwd_vals <- cwd_historic %>% 
+#     mask(sp_range) %>% 
+#     as.data.frame(xy = TRUE) %>% 
+#     drop_na()
+#   
+#   pet_vals <- pet_historic %>% 
+#     mask(sp_range) %>% 
+#     as.data.frame(xy = TRUE) %>% 
+#     drop_na()
+#   
+#   temp_vals <- temps_historic %>% 
+#     mask(sp_range) %>% 
+#     as.data.frame(xy = TRUE) %>% 
+#     drop_na()
+#   
+#   # Combine into tibble
+#   clim_vals <- cwd_vals %>% 
+#     left_join(pet_vals, by = c("x", "y")) %>% 
+#     left_join(temp_vals, by = c("x", "y"))
+#   
+#   return(clim_vals)
+# }
+
+# updated pull_clim function using terra, instead of raster
+pull_clim_tc <- function(spp_code, clim_raster){
   print(spp_code)
+  
   # Pull relevant range map
   sp_range <- range_sf %>%
-    filter(sp_code == spp_code) %>% 
-    rasterize(cwd_historic, getCover=TRUE)
-  sp_range[sp_range==0] <- NA
+    filter(sp_code == spp_code)
   
-  # Pull cwd and aet values
-  cwd_vals <- cwd_historic %>% 
-    mask(sp_range) %>% 
+  # Pull clim values
+  clim_vals <- clim_raster %>% 
+    mask(mask = sp_range, touches = TRUE) %>% 
     as.data.frame(xy = TRUE) %>% 
     drop_na()
-  
-  pet_vals <- pet_historic %>% 
-    mask(sp_range) %>% 
-    as.data.frame(xy = TRUE) %>% 
-    drop_na()
-  
-  temp_vals <- temps_historic %>% 
-    mask(sp_range) %>% 
-    as.data.frame(xy = TRUE) %>% 
-    drop_na()
-  
-  # Combine into tibble
-  clim_vals <- cwd_vals %>% 
-    left_join(pet_vals, by = c("x", "y")) %>% 
-    left_join(temp_vals, by = c("x", "y"))
   
   return(clim_vals)
 }
-
 
 species_list <- range_sf %>%
   pull(sp_code) %>% 
@@ -169,11 +235,17 @@ species_list <- range_sf %>%
   arrange(sp_code) %>% 
   drop_na()
 
-clim_df <- species_list %>% 
-  mutate(clim_vals = future_map(sp_code, 
-                                .f = pull_clim,
-                                .options = furrr_options(packages = c( "dplyr", "raster", "sf")),
-                                .progress = TRUE))
+pull_clim_tc <- partial(.f = pull_clim_tc, clim_raster = clim_tc)
+
+clim_df <- species_list %>%
+  mutate(clim_vals = map(sp_code,.f = pull_clim_tc))
+
+
+# clim_df <- species_list %>% 
+#   mutate(clim_vals = future_map(sp_code, 
+#                                 .f = pull_clim,
+#                                 .options = furrr_options(packages = c( "dplyr", "raster", "sf")),
+#                                 .progress = TRUE))
 
 
 ## Summarize mean and sd of each species' climate
@@ -183,13 +255,13 @@ niche_df <- clim_df %>%
   summarize(pet_mean = mean(pet),
             pet_sd = sd(pet),
             cwd_mean = mean(cwd),
-            cwd_sd = sd(cwd),
-            temp_mean = mean(temp),
-            temp_sd = sd(temp))
+            cwd_sd = sd(cwd))
+            #temp_mean = mean(temp),
+            #temp_sd = sd(temp))
 
 
 ## Export species niche description
-write.csv(niche_df, paste0(output_dir, "clim_niche_old.csv"))
+write.csv(niche_df, paste0(output_dir, "clim_niche.csv"))
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -200,19 +272,19 @@ sp_standardize <- function(val, sp_mean, sp_sd){
   return(std_val)
 }
 
-sp_std_historic_df <- function(hist_clim_vals, pet_mean, pet_sd, cwd_mean, cwd_sd, temp_mean, temp_sd){
+sp_std_historic_df <- function(hist_clim_vals, pet_mean, pet_sd, cwd_mean, cwd_sd){
   hist_clim_vals <- hist_clim_vals %>% 
     mutate_at(vars(starts_with("cwd")), 
               ~sp_standardize(.x, cwd_mean, cwd_sd)) %>% 
     mutate_at(vars(starts_with("pet")), 
-              ~sp_standardize(.x, pet_mean, pet_sd)) %>% 
-    mutate_at(vars(starts_with("temp")), 
-              ~sp_standardize(.x, temp_mean, temp_sd))
+              ~sp_standardize(.x, pet_mean, pet_sd)) #%>% 
+    #mutate_at(vars(starts_with("temp")), 
+             # ~sp_standardize(.x, temp_mean, temp_sd))
   return(hist_clim_vals)
 }
 
 
-sp_std_future_df <- function(cmip_df, hist_clim_vals, pet_mean, pet_sd, cwd_mean, cwd_sd, temp_mean, temp_sd){
+sp_std_future_df <- function(cmip_df, hist_clim_vals, pet_mean, pet_sd, cwd_mean, cwd_sd){
   valid_locations <- hist_clim_vals %>% select(x,y)
   cmip_df <- valid_locations %>% 
     left_join(cmip_df, by = c("x", "y"))
@@ -220,9 +292,9 @@ sp_std_future_df <- function(cmip_df, hist_clim_vals, pet_mean, pet_sd, cwd_mean
     mutate_at(vars(starts_with("cwd")), 
               ~sp_standardize(.x, cwd_mean, cwd_sd)) %>% 
     mutate_at(vars(starts_with("pet")), 
-              ~sp_standardize(.x, pet_mean, pet_sd)) %>% 
-    mutate_at(vars(starts_with("temp")), 
-              ~sp_standardize(.x, temp_mean, temp_sd))
+              ~sp_standardize(.x, pet_mean, pet_sd)) #%>% 
+    #mutate_at(vars(starts_with("temp")), 
+             # ~sp_standardize(.x, temp_mean, temp_sd))
   return(cmip_df)
 }
 
@@ -235,9 +307,9 @@ clim_df <- clim_df %>%
                                              pet_mean = pet_mean,
                                              pet_sd = pet_sd,
                                              cwd_mean = cwd_mean,
-                                             cwd_sd = cwd_sd,
-                                             temp_mean = temp_mean,
-                                             temp_sd = temp_sd),
+                                             cwd_sd = cwd_sd),
+                                             #temp_mean = temp_mean,
+                                             #temp_sd = temp_sd),
                                         .f = sp_std_historic_df,
                                         .options = furrr_options(packages = c( "dplyr"))))
 # NOTE: May no longer need this dataframe???
@@ -349,7 +421,7 @@ sp_cmip_clim <- sp_cmip_clim %>%
 
 
 ## Export predictions
-write_rds(sp_cmip_clim, paste0(output_dir, "sp_clim_predictions_old.", compress = "gz"))
+write_rds(sp_cmip_clim, paste0(output_dir, "sp_clim_predictions.", compress = "gz"))
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -363,38 +435,38 @@ write_rds(sp_cmip_clim, paste0(output_dir, "sp_clim_predictions_old.", compress 
 # ===============================================================
 
 # Calculate site-level annual climate
-site_clim_df = site_clim_df %>%
-  group_by(location_id, year) %>%
-  summarise(
-    aet.an = sum(aet),
-    cwd.an = sum(cwd),
-    pet.an = sum((aet+cwd)),
-    temp.an = mean(tmean),
-    .groups = "drop")
+# site_clim_df = site_clim_df %>%
+#   group_by(collection_id, year) %>%
+#   summarise(
+#     #aet.an = sum(aet),
+#     cwd.an = sum(cwd),
+#     pet.an = sum(pet),
+#     #temp.an = mean(tmean),
+#     .groups = "drop")
 
 ### Calculate site-level, average, historic, relative climate (for second stage)
 ## TODO: Note - dropping CANA323 because it has null climate data for a few months each year. might want to dig into this
 site_clim_df <- site_clim_df %>% 
-  filter(location_id != "CANA323")
+  filter(collection_id != "CANA323")
 
 ave_site_clim_df <- site_clim_df %>% 
   filter(year < 1980) %>% 
-  group_by(location_id) %>% 
+  group_by(collection_id) %>% 
   summarise(cwd.ave = mean(cwd.an),
             pet.ave = mean(pet.an),
             cwd.sd = sd(cwd.an),
-            pet.sd = sd(pet.an),
-            temp.ave = mean(temp.an),
-            temp.sd = sd(temp.an)) %>% 
+            pet.sd = sd(pet.an)) %>% 
+            #temp.ave = mean(temp.an),
+            #temp.sd = sd(temp.an)) %>% 
   ungroup()
 
 spstd_site_clim_df <- site_smry %>% 
-  left_join(ave_site_clim_df, by = "location_id") %>% 
+  left_join(ave_site_clim_df, by = "collection_id") %>% 
   group_by(sp_code) %>% 
   nest(data = c(collection_id, 
                 cwd.ave, 
-                # pet.ave, 
-                temp.ave)) %>% 
+                pet.ave)) %>%  
+                #temp.ave)) %>% 
   left_join(niche_df, by = ("sp_code")) %>%
   drop_na() # Dropping some species due to NA niche data
 
@@ -403,46 +475,45 @@ spstd_site_clim_df <- spstd_site_clim_df %>%
                                       pet_mean = pet_mean,
                                       pet_sd = pet_sd,
                                       cwd_mean = cwd_mean,
-                                      cwd_sd = cwd_sd,
-                                      temp_mean = temp_mean,
-                                      temp_sd = temp_sd),
+                                      cwd_sd = cwd_sd),
+                                      #temp_mean = temp_mean,
+                                      #temp_sd = temp_sd),
                                  .f = sp_std_historic_df,
                                  .options = furrr_options(packages = c( "dplyr"))))
 
 spstd_site_clim_df <- spstd_site_clim_df %>% 
   unnest(site_clim) %>% 
   rename(cwd.spstd = cwd.ave, 
-         pet.spstd = pet.ave, 
-         temp.spstd = temp.ave) %>% 
+         pet.spstd = pet.ave) %>%  
+         #temp.spstd = temp.ave) %>% 
   mutate(cwd.sd = cwd.sd / cwd_sd,
-         pet.sd = pet.sd / pet_sd,
-         temp.sd = temp.sd / temp_sd) %>% 
+         pet.sd = pet.sd / pet_sd) %>% 
+         #temp.sd = temp.sd / temp_sd) %>% 
   ungroup() %>% 
   select(collection_id, location_id, cwd.spstd, 
          pet.spstd, 
-         temp.spstd, cwd.sd, 
-         pet.sd, 
-         temp.sd)
+         #temp.spstd, 
+         cwd.sd, 
+         pet.sd) 
+         #temp.sd)
 
 spstd_site_clim_df <- spstd_site_clim_df %>% 
-  left_join(ave_site_clim_df %>% select(location_id, 
+  left_join(ave_site_clim_df %>% select(collection_id, 
                                         cwd.ave, 
-                                        pet.ave, 
-                                        temp.ave), by = "location_id")
+                                        pet.ave), by = "collection_id") 
+                                        #temp.ave), by = "location_id")
 
 spstd_site_clim_df <- spstd_site_clim_df %>% 
   select(-location_id)
 
 write_rds(spstd_site_clim_df, 
-          paste0(output_dir, "site_ave_clim_old.", compress = "gz"))
-
-
+          paste0(output_dir, "site_ave_clim.", compress = "gz"))
 
 
 
 ### Calculate site-level, annual, historic, relative climate (for first stage) 
 an_site_clim_df <- site_smry %>% 
-  left_join(site_clim_df, by = "location_id") %>% 
+  left_join(site_clim_df, by = "collection_id") %>% 
   group_by(sp_code) %>% 
   nest() %>% 
   left_join(niche_df, by = "sp_code") %>% 
@@ -453,28 +524,28 @@ an_site_clim_df <- an_site_clim_df %>%
                                       pet_mean = pet_mean,
                                       pet_sd = pet_sd,
                                       cwd_mean = cwd_mean,
-                                      cwd_sd = cwd_sd,
-                                      temp_mean = temp_mean,
-                                      temp_sd = temp_sd),
+                                      cwd_sd = cwd_sd),
+                                      #temp_mean = temp_mean,
+                                      #temp_sd = temp_sd),
                                  .f = sp_std_historic_df,
                                  .options = furrr_options(packages = c( "dplyr"))))
 
 an_site_clim_df <- an_site_clim_df %>% 
   unnest(site_clim) %>% 
   rename(cwd.an.spstd = cwd.an, 
-         pet.an.spstd = pet.an, 
-         temp.an.spstd = temp.an) %>% 
-  ungroup() %>% 
+         pet.an.spstd = pet.an) %>%  
+         #temp.an.spstd = temp.an) %>% 
+  #ungroup() %>% 
   select(
     # -aet.an, 
     -pet_mean, 
-    -pet_sd, -cwd_mean, -cwd_sd, -temp_mean, -temp_sd, -data, -sp_code)
+    -pet_sd, -cwd_mean, -cwd_sd, -data, -sp_code)
 
 an_site_clim_df <- an_site_clim_df %>%
   select(-location_id)
 
 write_rds(an_site_clim_df, 
-          paste0(output_dir, "site_an_clim_old.", compress = "gz"))
+          paste0(output_dir, "site_an_clim.", compress = "gz"))
 
 
 # ## Exploring source of dropped sites - seems to be entirely driven by sites for species with no range maps
@@ -556,7 +627,7 @@ library(furrr)
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Define path
 data_dir <- "~/../../capstone/climatree/raw_data/"
-output_dir <- "~/../../capstone/climatree/output/old-output/"
+output_dir <- "~/../../capstone/climatree/output/new-output/"
 
 
 # 1. Dendrochronologies
@@ -577,7 +648,7 @@ dendro_df <- dendro_df %>%
   as_tibble()
 
 # 2. Historic site-level climate
-an_site_clim <- read_rds(paste0(output_dir, "site_an_clim_old.gz"))
+an_site_clim <- read_rds(paste0(output_dir, "site_an_clim.gz"))
 dendro_df <- dendro_df %>% 
   left_join(an_site_clim, by = c("collection_id", "year"))
 
@@ -594,7 +665,7 @@ dendro_df <- dendro_df %>%
 
 
 # 4. Drop data from species without range maps and resulting climatic niche data
-niche_df <- read.csv(paste0(output_dir, "clim_niche_old.csv")) %>%
+niche_df <- read.csv(paste0(output_dir, "clim_niche.csv")) %>%
   select(-X)
 niche_species <- niche_df %>% pull(sp_code) %>% unique()
 dendro_species <- dendro_df %>% pull(species_id) %>% unique()
@@ -681,8 +752,8 @@ fs_mod <- function(site_data, outcome = "rwi", energy_var = "pet.an", mod_type =
 site_df <- dendro_df %>% 
   # drop_na() %>% 
   rename(cwd.an = cwd.an.spstd,
-         #pet.an = pet.an.spstd,
-         temp.an = temp.an.spstd) %>% 
+         pet.an = pet.an.spstd) %>% 
+         #temp.an = temp.an.spstd) %>% 
   group_by(collection_id) %>%
   add_tally(name = 'nobs') %>% 
   # filter(nobs>10) %>% 
@@ -697,10 +768,10 @@ fs_mod_bl <- partial(fs_mod, outcome = "rwi", energy_var = "pet.an", mod_type = 
 
 site_df <- site_df %>% 
   mutate(fs_result = map(data, .f = fs_mod_bl))
-         # fs_result_nb = map(data, .f = fs_mod_nb),
-         # fs_result_ar = map(data, .f = fs_mod_ar),
-         # fs_result_temp = map(data, .f = fs_mod_temp),
-         # fs_result_re = map(data, .f = fs_mod_re))
+# fs_result_nb = map(data, .f = fs_mod_nb),
+# fs_result_ar = map(data, .f = fs_mod_ar),
+# fs_result_temp = map(data, .f = fs_mod_temp),
+# fs_result_re = map(data, .f = fs_mod_re))
 
 
 data_df <- site_df %>% 
@@ -717,7 +788,7 @@ fs_df <- fs_df %>%
 fs_df <- fs_df %>% 
   select(-error)
 
-fs_df %>% write_csv(paste0(output_dir, 'site_pet_cwd_std_old.csv'))
+fs_df %>% write_csv(paste0(output_dir, 'site_pet_cwd_std.csv'))
 
 
 # ## Repeat using results from nb detrended data
