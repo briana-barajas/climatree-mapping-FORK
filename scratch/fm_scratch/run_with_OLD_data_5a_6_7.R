@@ -732,6 +732,9 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
               rwi_pclim_change = mean(rwi_pclim_change))
   # change_dif = mean(change_dif))
   
+  print(paste("Number of observations after summarise():", nrow(agg_stats)))
+  print(paste("Number of variables after summarise():", ncol(agg_stats)))
+  
   ## Prep historic climate data
   sp_hist <- (sp_clim %>% 
                 filter(sp_code == spp_code) %>% 
@@ -867,6 +870,7 @@ mc_nests <- sp_mc %>%
   group_by(sp_code) %>%
   nest() %>% 
   drop_na()
+
 
 # Generally have memory issues with 38 (LAGM), and 93 (PISY) - need to run these with two cores
 # large_range_sp <- c("lagm", "pisy")

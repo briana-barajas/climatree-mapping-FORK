@@ -51,7 +51,7 @@ future::plan(multisession, workers = n_cores)
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Define path
 data_dir <- "~/../../capstone/climatree/raw_data/"
-output_dir <- "~/../../capstone/climatree/output/old-output/"
+output_dir <- "~/../../capstone/climatree/output/1-process-raw-data/"
 
 # 1. Historic climate raster
 clim_file <- paste0(data_dir, 'HistoricCWD_AETGrids_Annual.Rdat')
