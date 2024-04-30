@@ -502,14 +502,14 @@ library(furrr)
 library(snow)
 library(profvis)
 library(tmap)
-library(tidylog)
+library(tidylog, warn.conflicts = FALSE)
 
 n_cores <- availableCores()
 future::plan(multisession, workers = n_cores)
 
 my_seed <- 5597
 
-n_mc <- 10000
+n_mc <- 50
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -532,7 +532,8 @@ mod_df <- mod_df %>%
 
 # 2. Species-standardized historic and future climate
 sp_clim <- read_rds(paste0(output_dir, "sp_clim_predictions.gz")) %>% 
-  filter(sp_code == "pipo")
+  filter(sp_code == "pipo") %>% 
+  head(500)
 species_list <- sp_clim %>% select(sp_code)
 
 
@@ -899,29 +900,36 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
            cwd_cmip_start_mean = mean(c_across(starts_with("cwd_cmip_start")))) %>% 
     select(x, y, cwd_cmip_start_mean, cwd_cmip_end_mean, pet_cmip_start_mean, pet_cmip_end_mean)
   
-  if (anyNA(sp_predictions)) {
-    warning("Missing or NA values found in sp_cmip after calculating cmip means.")
-  }
-  
-  print("Mean of cmip calculated")
-  
-  print("Joining cmip calculations to sp_predictions")
-  
-  sp_predictions <- sp_predictions %>% 
-    left_join(sp_cmip, by = c("x", "y")) %>% 
-    as_tibble()
-  
-  if (anyNA(sp_predictions)) {
-    warning("Missing or NA values found in sp_predictions after joining with observed and predicted climate data.")
-  }
-  
-  print("Finished joining cmip calculations to sp_predictions")
-  
-  ## Write out
-  write_rds(sp_predictions, paste0(output_dir, "sp_rwi_pipo.gz"), compress = "gz")
-  
-  toc()
-  return(agg_stats)
+  assign("sp_cmip", sp_cmip, envir = .GlobalEnv)
+  # if (anyNA(sp_cmip)) {
+  #   warning("Missing or NA values found in sp_cmip after calculating cmip means.")
+  # }
+  # 
+  # print("Mean of cmip calculated")
+  # 
+  # print("Joining cmip calculations to sp_predictions")
+  # 
+  # #sp_cmip<- sp_cmip %>% 
+  #  # drop_na()
+  # 
+  # #sp_predictions <- sp_predictions %>% 
+  #  # drop_na()
+  # 
+  # sp_predictions <- sp_predictions %>%
+  #   left_join(sp_cmip, by = c("x", "y")) %>% 
+  #   as_tibble()
+  # 
+  # if (anyNA(sp_predictions)) {
+  #   warning("Missing or NA values found in sp_predictions after joining with observed and predicted climate data.")
+  # }
+  # 
+  # print("Finished joining cmip calculations to sp_predictions")
+  # 
+  # ## Write out
+  # write_rds(sp_predictions, paste0(output_dir, "sp_rwi_pipo.gz"), compress = "gz")
+  # 
+  # toc()
+  # return(agg_stats)
 }
 
   
