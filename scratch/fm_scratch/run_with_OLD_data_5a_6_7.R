@@ -97,7 +97,7 @@ flm_df <- flm_df %>%
 
 #Filter for species code pcgl (White Spruce)
 flm_df <- flm_df %>% 
-  filter(species_id == "pcgl")
+  filter(species_id == "pipo")
 
 
 
@@ -135,7 +135,7 @@ flm_df <- flm_df %>%
            (estimate_pet.an>pet_est_bounds[2]))
 
 # Save out full flm_df to simplify downstream scripts and ensure consistency
-flm_df %>% write.csv(paste0(output_dir, "site_pet_cwd_std_augmented_pcgl_old.csv"))
+flm_df %>% write.csv(paste0(output_dir, "site_pet_cwd_std_augmented_pipo_old.csv"))
 
 # Trim outliers
 trim_df <- flm_df %>% 
@@ -351,7 +351,7 @@ block_draw_df <- block_draw_df %>%
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  block_draw_df %>% 
   select(boot_id, collection_id, cwd_coef, pet_coef, int_coef, cwd.spstd, pet.spstd) %>% 
-  write_rds(paste0(output_dir, "mc_sample_pcgl_old.gz"), compress = "gz")
+  write_rds(paste0(output_dir, "mc_sample_pipo_old.gz"), compress = "gz")
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -436,7 +436,7 @@ boot_df <- boot_df %>%
 
 
 ## Save out bootstrapped coefficients
-write_rds(boot_df, paste0(output_dir, "ss_bootstrap_pcgl_old.rds"))
+write_rds(boot_df, paste0(output_dir, "ss_bootstrap_pipo_old.rds"))
 
 
 
@@ -532,7 +532,7 @@ mod_df <- mod_df %>%
 
 # 2. Species-standardized historic and future climate
 sp_clim <- read_rds(paste0(output_dir, "sp_clim_predictions_old.gz")) %>% 
-  filter(sp_code == "pcgl")
+  filter(sp_code == "pipo")
 species_list <- sp_clim %>% select(sp_code)
 
 
@@ -742,6 +742,8 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
     rename(cwd_hist = cwd,
            pet_hist = pet)
   
+  assign("sp_hist", sp_hist, envir = .GlobalEnv)
+  
   # ## Write out full mc rwi change results for subset of hot cells (pet ~= 1)
   # hot_cells <- sp_hist %>% filter(pet_hist > 0.9, pet_hist < 1.1)
   # hot_cells <- hot_cells %>% 
@@ -846,6 +848,8 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
                 filter(sp_code == spp_code) %>% 
                 pull(clim_cmip_sp))[[1]]
   
+  assign("sp_cmip", sp_cmip, envir = .GlobalEnv)
+  
   sp_cmip <- sp_cmip %>%
     rowwise() %>% 
     mutate(pet_cmip_end_mean = mean(c_across(starts_with("pet_cmip_end"))),
@@ -859,7 +863,7 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
     as_tibble()
   
   ## Write out
-  write_rds(sp_predictions, paste0(output_dir, "sp_rwi_pcgl_old.gz"), compress = "gz")
+  write_rds(sp_predictions, paste0(output_dir, "sp_rwi_pipo_old.gz"), compress = "gz")
  
   toc()
   return(agg_stats)
@@ -896,7 +900,7 @@ mc_nests_small <- mc_nests %>%
 agg_stats <- mc_nests_small %>% 
   select(-data) %>% 
   unnest(predictions) %>% 
-  write_rds(file = paste0(output_dir, "mc_agg_stats.gz"), compress = "gz")
+  write_rds(file = paste0(output_dir, "mc_agg_stats_pipo_old.gz"), compress = "gz")
 
 
 test <- agg_stats %>% 
