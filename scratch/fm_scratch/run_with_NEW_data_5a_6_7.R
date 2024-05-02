@@ -58,9 +58,9 @@ set.seed(5597)
 
 select <- dplyr::select
 
-n_mc <- 10000
+n_mc <- 1000
 
-
+rm(list = ls())
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Import data --------------------------------------------------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -97,7 +97,7 @@ flm_df <- flm_df %>%
 
 #Filter for species code pcgl (White Spruce)
 flm_df <- flm_df %>% 
-  filter(species_id == "tsme")
+  filter(species_id == "pipo")
 
 
 
@@ -135,7 +135,7 @@ flm_df <- flm_df %>%
            (estimate_pet.an>pet_est_bounds[2]))
 
 # Save out full flm_df to simplify downstream scripts and ensure consistency
-flm_df %>% write.csv(paste0(output_dir, "site_pet_cwd_std_augmented_tsme.csv"))
+flm_df %>% write.csv(paste0(output_dir, "site_pet_cwd_std_augmented_pipo.csv"))
 
 # Trim outliers
 trim_df <- flm_df %>% 
@@ -351,7 +351,7 @@ block_draw_df <- block_draw_df %>%
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 block_draw_df %>% 
   select(boot_id, collection_id, cwd_coef, pet_coef, int_coef, cwd.spstd, pet.spstd) %>% 
-  write_rds(paste0(output_dir, "mc_sample_tsme.gz"), compress = "gz")
+  write_rds(paste0(output_dir, "mc_sample_pipo.gz"), compress = "gz")
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -436,7 +436,7 @@ boot_df <- boot_df %>%
 
 
 ## Save out bootstrapped coefficients
-write_rds(boot_df, paste0(output_dir, "ss_bootstrap_tsme.rds"))
+write_rds(boot_df, paste0(output_dir, "ss_bootstrap_pipo.rds"))
 
 
 
@@ -509,7 +509,7 @@ future::plan(multisession, workers = n_cores)
 
 my_seed <- 5597
 
-n_mc <- 50
+n_mc <- 1000
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -534,8 +534,7 @@ mod_df <- mod_df %>%
 sp_clim <- read_rds(paste0(output_dir, "sp_clim_predictions.gz")) %>% 
   filter(sp_code == "pipo")
 species_list <- sp_clim %>% select(sp_code)
-
-
+            
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Assign MC coefs and CMIP models  ---------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

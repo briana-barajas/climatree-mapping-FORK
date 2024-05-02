@@ -40,13 +40,13 @@ library(tmap)
 library(tictoc)
 library(terra)
 library(data.table)
+library(dplyr)
 select <- dplyr::select
 
 
 library(furrr)
-n_cores <- 8
+n_cores <- 10
 future::plan(multisession, workers = n_cores)
-
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Load data --------------------------------------------------------------
@@ -169,10 +169,10 @@ rm(aet_raster)
 # #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # # Visually inspect data -----------------------------------------------
 # #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# tmap_mode("view")
-# tm_shape(cwd_cmip_end) +
-#   tm_raster() +
-#   tm_facets(as.layers = TRUE)
+ tmap_mode("view")
+ tm_shape(cwd_cmip_end) +
+   tm_raster() +
+   tm_facets(as.layers = TRUE)
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Summarize species niches -----------------------------------------------
@@ -255,9 +255,10 @@ niche_df <- clim_df %>%
   summarize(pet_mean = mean(pet),
             pet_sd = sd(pet),
             cwd_mean = mean(cwd),
-            cwd_sd = sd(cwd))
+            cwd_sd = sd(cwd)) %>% 
             #temp_mean = mean(temp),
             #temp_sd = sd(temp))
+            filter(sp_code %in% c("abal", "acsh", "juoc"))
 
 
 ## Export species niche description
@@ -287,7 +288,7 @@ sp_std_historic_df <- function(hist_clim_vals, pet_mean, pet_sd, cwd_mean, cwd_s
 sp_std_future_df <- function(cmip_df, hist_clim_vals, pet_mean, pet_sd, cwd_mean, cwd_sd){
   valid_locations <- hist_clim_vals %>% select(x,y)
   cmip_df <- valid_locations %>% 
-    left_join(cmip_df, by = c("x", "y"))
+    right_join(cmip_df, by = c("x", "y"))
   cmip_df <- cmip_df %>% 
     mutate_at(vars(starts_with("cwd")), 
               ~sp_standardize(.x, cwd_mean, cwd_sd)) %>% 
@@ -299,8 +300,12 @@ sp_std_future_df <- function(cmip_df, hist_clim_vals, pet_mean, pet_sd, cwd_mean
 }
 
 
+
 clim_df <- clim_df %>% 
   left_join(niche_df, by = "sp_code")
+
+
+
 
 clim_df <- clim_df %>% 
   mutate(clim_historic_sp = future_pmap(list(hist_clim_vals = clim_vals,
@@ -312,6 +317,7 @@ clim_df <- clim_df %>%
                                              #temp_sd = temp_sd),
                                         .f = sp_std_historic_df,
                                         .options = furrr_options(packages = c( "dplyr"))))
+
 # NOTE: May no longer need this dataframe???
 
 
@@ -421,7 +427,7 @@ sp_cmip_clim <- sp_cmip_clim %>%
 
 
 ## Export predictions
-write_rds(sp_cmip_clim, paste0(output_dir, "sp_clim_predictions.", compress = "gz"))
+write_rds(sp_cmip_clim, paste0(output_dir, "sp_clim_predictions.gz", compress = "gz"))
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
