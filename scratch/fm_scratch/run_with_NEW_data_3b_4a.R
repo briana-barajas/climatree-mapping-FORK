@@ -40,13 +40,13 @@ library(tmap)
 library(tictoc)
 library(terra)
 library(data.table)
-library(dplyr)
 select <- dplyr::select
 
 
 library(furrr)
-n_cores <- 10
+n_cores <- 8
 future::plan(multisession, workers = n_cores)
+
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Load data --------------------------------------------------------------
@@ -105,7 +105,8 @@ site_smry <- site_smry %>%
   select(collection_id, sp_id, latitude) %>% 
   mutate(location_id = collection_id) %>% 
   mutate(sp_code = tolower(sp_id)) %>% 
-  select(-sp_id)
+  select(-sp_id) #%>% 
+  #filter(sp_code %in% c("abal", "acsh", "juoc"))
 
 # convert site_clim_df to data table for calculation below
 setDT(site_clim_df)
@@ -169,49 +170,49 @@ rm(aet_raster)
 # #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # # Visually inspect data -----------------------------------------------
 # #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
- tmap_mode("view")
- tm_shape(cwd_cmip_end) +
-   tm_raster() +
-   tm_facets(as.layers = TRUE)
+# tmap_mode("view")
+# tm_shape(cwd_cmip_end) +
+#   tm_raster() +
+#   tm_facets(as.layers = TRUE)
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Summarize species niches -----------------------------------------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Pull and organize climate distribution for species
-# pull_clim <- function(spp_code){
-#   print(spp_code)
-#   # Pull relevant range map
-#   sp_range <- range_sf %>%
-#     filter(sp_code == spp_code) %>% 
-#     rasterize(cwd_historic, getCover=TRUE)
-#   sp_range[sp_range==0] <- NA
-#   
-#   # Pull cwd and aet values
-#   cwd_vals <- cwd_historic %>% 
-#     mask(sp_range) %>% 
-#     as.data.frame(xy = TRUE) %>% 
-#     drop_na()
-#   
-#   pet_vals <- pet_historic %>% 
-#     mask(sp_range) %>% 
-#     as.data.frame(xy = TRUE) %>% 
-#     drop_na()
-#   
-#   temp_vals <- temps_historic %>% 
-#     mask(sp_range) %>% 
-#     as.data.frame(xy = TRUE) %>% 
-#     drop_na()
-#   
-#   # Combine into tibble
-#   clim_vals <- cwd_vals %>% 
-#     left_join(pet_vals, by = c("x", "y")) %>% 
-#     left_join(temp_vals, by = c("x", "y"))
-#   
-#   return(clim_vals)
-# }
+ # pull_clim <- function(spp_code){
+ #   print(spp_code)
+ #   # Pull relevant range map
+ #   sp_range <- range_sf %>%
+ #     filter(sp_code == spp_code) %>% 
+ #     rasterize(cwd_historic, getCover=TRUE)
+ #   sp_range[sp_range==0] <- NA
+ #   
+ #   # Pull cwd and aet values
+ #   cwd_vals <- cwd_historic %>% 
+ #     mask(sp_range) %>% 
+ #     as.data.frame(xy = TRUE) %>% 
+ #     drop_na()
+ #   
+ #   pet_vals <- pet_historic %>% 
+ #     mask(sp_range) %>% 
+ #     as.data.frame(xy = TRUE) %>% 
+ #     drop_na()
+ #   
+ #   temp_vals <- temps_historic %>% 
+ #     mask(sp_range) %>% 
+ #     as.data.frame(xy = TRUE) %>% 
+ #     drop_na()
+ #   
+ #   # Combine into tibble
+ #   clim_vals <- cwd_vals %>% 
+ #     left_join(pet_vals, by = c("x", "y")) %>% 
+ #     left_join(temp_vals, by = c("x", "y"))
+ #   
+ #   return(clim_vals)
+ # }
 
-# updated pull_clim function using terra, instead of raster
-pull_clim_tc <- function(spp_code, clim_raster){
+# # updated pull_clim function using terra, instead of raster
+pull_clim <- function(spp_code, clim_raster){
   print(spp_code)
   
   # Pull relevant range map
@@ -233,32 +234,32 @@ species_list <- range_sf %>%
   enframe(name = NULL) %>% 
   select(sp_code = value) %>% 
   arrange(sp_code) %>% 
-  drop_na()
+  drop_na() #%>% 
+  #filter(sp_code %in% c("abal", "acsh", "juoc"))
 
-pull_clim_tc <- partial(.f = pull_clim_tc, clim_raster = clim_tc)
+pull_clim_tc <- partial(.f = pull_clim, clim_raster = clim_tc)
 
-clim_df <- species_list %>%
+clim_df_tc <- species_list %>%
   mutate(clim_vals = map(sp_code,.f = pull_clim_tc))
 
 
-# clim_df <- species_list %>% 
-#   mutate(clim_vals = future_map(sp_code, 
-#                                 .f = pull_clim,
-#                                 .options = furrr_options(packages = c( "dplyr", "raster", "sf")),
-#                                 .progress = TRUE))
+ # clim_df <- species_list %>% 
+ #   mutate(clim_vals = future_map(sp_code, 
+ #                                 .f = pull_clim,
+ #                                 .options = furrr_options(packages = c( "dplyr", "raster", "sf")),
+ #                                 .progress = TRUE))
 
 
 ## Summarize mean and sd of each species' climate
-niche_df <- clim_df %>% 
+niche_df <- clim_df_tc %>% 
   unnest(clim_vals) %>% 
   group_by(sp_code) %>% 
   summarize(pet_mean = mean(pet),
             pet_sd = sd(pet),
             cwd_mean = mean(cwd),
-            cwd_sd = sd(cwd)) %>% 
+            cwd_sd = sd(cwd))
             #temp_mean = mean(temp),
             #temp_sd = sd(temp))
-            filter(sp_code %in% c("abal", "acsh", "juoc"))
 
 
 ## Export species niche description
@@ -300,11 +301,8 @@ sp_std_future_df <- function(cmip_df, hist_clim_vals, pet_mean, pet_sd, cwd_mean
 }
 
 
-
-clim_df <- clim_df %>% 
+clim_df <- clim_df_tc %>% 
   left_join(niche_df, by = "sp_code")
-
-
 
 
 clim_df <- clim_df %>% 
@@ -317,7 +315,6 @@ clim_df <- clim_df %>%
                                              #temp_sd = temp_sd),
                                         .f = sp_std_historic_df,
                                         .options = furrr_options(packages = c( "dplyr"))))
-
 # NOTE: May no longer need this dataframe???
 
 
@@ -369,6 +366,7 @@ cmip_df <- cwd_end_df %>%
   full_join(cwd_start_df, by = c("x", "y")) %>% 
   full_join(pet_start_df, by = c("x", "y"))
 
+
 ## Nest CMIP data
 cmip_df <- cmip_df %>%
   mutate(idx = 1) %>% 
@@ -384,7 +382,6 @@ cmip_df <- cmip_df %>%
 ## Cross species list with nested cmip data
 sp_cmip_clim <- clim_df %>% 
   mutate(cmip_df = cmip_df$data)
-
 
 
 sp_cmip_clim <- sp_cmip_clim %>% 
@@ -513,7 +510,7 @@ spstd_site_clim_df <- spstd_site_clim_df %>%
   select(-location_id)
 
 write_rds(spstd_site_clim_df, 
-          paste0(output_dir, "site_ave_clim.", compress = "gz"))
+          paste0(output_dir, "site_ave_clim.gz", compress = "gz"))
 
 
 
@@ -551,7 +548,7 @@ an_site_clim_df <- an_site_clim_df %>%
   select(-location_id)
 
 write_rds(an_site_clim_df, 
-          paste0(output_dir, "site_an_clim.", compress = "gz"))
+          paste0(output_dir, "site_an_clim.gz", compress = "gz"))
 
 
 # ## Exploring source of dropped sites - seems to be entirely driven by sites for species with no range maps

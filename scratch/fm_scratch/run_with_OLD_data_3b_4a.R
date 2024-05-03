@@ -82,7 +82,8 @@ site_smry <- site_smry %>%
   select(collection_id, sp_id) %>% 
   mutate(location_id = collection_id) %>% 
   mutate(sp_code = tolower(sp_id)) %>% 
-  select(-sp_id)
+  select(-sp_id) %>% 
+  filter(sp_code %in% c("abal", "acsh", "juoc"))
 
 
 ## NOTE: FIA data not included in replication data repository
@@ -185,7 +186,8 @@ niche_df <- clim_df %>%
             cwd_mean = mean(cwd),
             cwd_sd = sd(cwd),
             temp_mean = mean(temp),
-            temp_sd = sd(temp))
+            temp_sd = sd(temp)) %>% 
+  filter(sp_code %in% c("abal", "acsh", "juoc"))
 
 
 ## Export species niche description

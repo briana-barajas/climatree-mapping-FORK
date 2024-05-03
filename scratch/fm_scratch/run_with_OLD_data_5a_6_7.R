@@ -535,7 +535,6 @@ sp_clim <- read_rds(paste0(output_dir, "sp_clim_predictions_old.gz")) %>%
   filter(sp_code == "pipo")
 species_list <- sp_clim %>% select(sp_code)
 
-
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Assign MC coefs and CMIP models  ---------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
