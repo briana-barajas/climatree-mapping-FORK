@@ -526,13 +526,13 @@ output_dir <- "~/../../capstone/climatree/output/old-output/"
 # dir.create(file.path(paste0(out_dir, "sp_hot_cells/")), showWarnings = FALSE)
 
 # 1. Second stage model
-mod_df <- read_rds(paste0(output_dir, "ss_bootstrap_old.rds"))
+mod_df <- read_rds(paste0(output_dir, "ss_bootstrap_pcgl_old.rds"))
 mod_df <- mod_df %>% 
   rename(iter_idx = boot_id)
 
 # 2. Species-standardized historic and future climate
 sp_clim <- read_rds(paste0(output_dir, "sp_clim_predictions_old.gz")) %>% 
-  filter(sp_code == "pipo")
+  filter(sp_code == "pcgl")
 species_list <- sp_clim %>% select(sp_code)
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

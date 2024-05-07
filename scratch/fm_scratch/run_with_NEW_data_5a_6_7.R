@@ -534,7 +534,6 @@ sp_clim <- read_rds(paste0(output_dir, "sp_clim_predictions.gz")) %>%
   filter(sp_code == "pcgl")
 species_list <- sp_clim %>% select(sp_code)
 
-
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Assign MC coefs and CMIP models  ---------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -698,6 +697,7 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
     select(iter_idx, cmip_idx, sensitivity, cwd_const_sens, pet_const_sens, int_const_sens)
   gc(verbose = TRUE)
   
+  
   print("Predicting future RWI")
   
   ## Predict future RWI for each of n_mc run
@@ -723,6 +723,7 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
                                     .f = calc_rwi_partials)) 
   }
   
+  
   print("Future RWI predicted.")
   
   sp_predictions <- sp_predictions %>% 
@@ -732,10 +733,6 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
            rwi_pclim_change = rwi_pclim_end - rwi_pclim_start, 
            rwi_pred_pclim_change_dif = rwi_pred_change - rwi_pclim_change)
   
-  
-  if (anyNA(sp_predictions)) {
-    warning("Missing or NA values found in sp_predictions after predicting future RWI.")
-  }
   
   gc(verbose = TRUE)
   
@@ -748,13 +745,6 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
     summarise(rwi_pred_change = mean(rwi_pred_change),
               rwi_pclim_change = mean(rwi_pclim_change))
   # change_dif = mean(change_dif))
-  
-  print(paste("Number of observations after summarise():", nrow(agg_stats)))
-  print(paste("Number of variables after summarise():", ncol(agg_stats)))
-  
-  if (anyNA(agg_stats)) {
-    warning("Missing or NA values found in agg_stats after calculating aggregate statistics.")
-  }
   
   print("Aggregate statistics calculated.")
   
@@ -866,19 +856,11 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
               sp_code = spp_code,
               .groups = "drop")
   
-  if (anyNA(sp_predictions)) {
-    warning("Missing or NA values found in sp_predictions after calculating cell-wise quantiles.")
-  }
-  
   print("Cell-wise quantiles calculated.")
   
   ## Add back observed climate data
   sp_predictions <- sp_predictions %>% 
     left_join(sp_hist, by = c("x", "y"))
-  
-  if (anyNA(sp_predictions)) {
-    warning("Missing or NA values found in sp_predictions after joining with historic climate data.")
-  }
   
   print("Adding observed and predicted climate data")
   
@@ -898,10 +880,6 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
            pet_cmip_start_mean = mean(c_across(starts_with("pet_cmip_start"))),
            cwd_cmip_start_mean = mean(c_across(starts_with("cwd_cmip_start")))) %>% 
     select(x, y, cwd_cmip_start_mean, cwd_cmip_end_mean, pet_cmip_start_mean, pet_cmip_end_mean)
-  
-   if (anyNA(sp_cmip)) {
-     warning("Missing or NA values found in sp_cmip after calculating cmip means.")
-   }
    
    print("Mean of cmip calculated")
    
@@ -911,14 +889,10 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
      left_join(sp_cmip, by = c("x", "y")) %>% 
      as_tibble()
    
-   if (anyNA(sp_predictions)) {
-     warning("Missing or NA values found in sp_predictions after joining with observed and predicted climate data.")
-   }
-   
    print("Finished joining cmip calculations to sp_predictions")
    
    ## Write out
-   write_rds(sp_predictions, paste0(output_dir, "sp_rwi_pipo.gz"), compress = "gz")
+   write_rds(sp_predictions, paste0(output_dir, "sp_rwi_pcgl.gz"), compress = "gz")
    
    toc()
    return(agg_stats)
@@ -955,7 +929,7 @@ mc_nests_small <- mc_nests %>%
 agg_stats <- mc_nests_small %>% 
   select(-data) %>% 
   unnest(predictions) %>% 
-  write_rds(file = paste0(output_dir, "mc_agg_stats_pipo.gz"), compress = "gz")
+  write_rds(file = paste0(output_dir, "mc_agg_stats_pcgl.gz"), compress = "gz")
 
 
 test <- agg_stats %>% 
