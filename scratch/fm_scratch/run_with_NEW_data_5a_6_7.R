@@ -1333,7 +1333,7 @@ high_color <- "#404788"
   low_color <- "#efca2a"
     low_color <- "#1b9e77"
       
-    #440154FF
+    ##440154FF
     #===============================================================================
     # Step 1: data and detrending  ---------
     #===============================================================================
@@ -1356,6 +1356,8 @@ high_color <- "#404788"
     #===============================================================================
     spp_predictions <- spp_predictions %>% filter(abs(cwd_hist) < 2)  ## TODO - Figure out correct cut-off for predictions
     
+    spp_predictions <- spp_predictions %>% 
+      select(x, y, cwd_sens, rwi_pred_change_mean)
     #spp_predictions <- spp_predictions %>%
     #select(x, y, cwd_sens, rwi_pred_change_mean)
     
