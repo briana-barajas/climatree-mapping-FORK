@@ -67,6 +67,7 @@ n_mc <- 1000
 data_dir <- "~/../../capstone/climatree/raw_data/"
 output_dir <- "~/../../capstone/climatree/output/new-output/"
 
+pcgl_psme_pisy %>% write_csv(paste0(output_dir, "pcgl_psme_pisy.csv"))
 # 1. Site-level regressions
 flm_df <- read_csv(paste0(output_dir, 'site_pet_cwd_std.csv'))
 
@@ -350,7 +351,7 @@ block_draw_df <- block_draw_df %>%
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 block_draw_df %>% 
   select(boot_id, collection_id, cwd_coef, pet_coef, int_coef, cwd.spstd, pet.spstd) %>% 
-  write_rds(paste0(output_dir, "mc_sample_pcgl.gz"), compress = "gz")
+  write_rds(paste0(output_dir, "mc_sample_pcgl."), compress = "gz")
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -523,15 +524,15 @@ output_dir <- "~/../../capstone/climatree/output/new-output/"
 # dir.create(file.path(out_dir), showWarnings = FALSE)
 #dir.create(file.path(paste0(output_dir, "sp_rwi/")), showWarnings = FALSE)
 # dir.create(file.path(paste0(out_dir, "sp_hot_cells/")), showWarnings = FALSE)
-
+clim_niche <- read_csv(paste0(output_dir, "clim_niche.csv"))
 # 1. Second stage model
-mod_df <- read_rds(paste0(output_dir, "ss_bootstrap_pcgl.rds"))
+mod_df <- read_rds(paste0(output_dir, "ss_bootstrap_pila.rds"))
 mod_df <- mod_df %>% 
   rename(iter_idx = boot_id)
 
 # 2. Species-standardized historic and future climate
 sp_clim <- read_rds(paste0(output_dir, "sp_clim_predictions.gz")) %>% 
-  filter(sp_code == "pcgl")
+  filter(sp_code == "pila")
 species_list <- sp_clim %>% select(sp_code)
             
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -550,7 +551,7 @@ cmip_assignments <- tibble(iter_idx = seq(1, n_mc)) %>%
   mutate(cmip_idx = sample(seq(n_cmip_mods), n_mc, replace = TRUE))
 
 ## Join cmip model assignments
-sp_mc <- sp_mc %>% 
+sp_mc <- sp_mc %>%
   left_join(cmip_assignments, by = "iter_idx")
 
 
@@ -634,7 +635,7 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
   set.seed(my_seed) # Re-setting seed at start of each iteration to ensure interrupted jobs still produce replicable results
   tic()
   
-  print("Starting processing for pcgl")
+  print("Starting processing for pipo")
   
   ## Iterating through each species
   print(spp_code)
@@ -912,7 +913,7 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
    print("Finished joining cmip calculations to sp_predictions")
    
    ## Write out
-   write_rds(sp_predictions, paste0(output_dir, "sp_rwi_pcgl.gz"), compress = "gz")
+   #write_rds(sp_predictions, paste0(output_dir, "sp_rwi_pcgl.gz"), compress = "gz")
    
    toc()
    return(agg_stats)
@@ -946,10 +947,10 @@ mc_nests_small <- mc_nests %>%
                                  parallel = TRUE),
                             .f = calc_rwi_quantiles)) 
 
-agg_stats <- mc_nests_small %>% 
-  select(-data) %>% 
-  unnest(predictions) %>% 
-  write_rds(file = paste0(output_dir, "mc_agg_stats_pipo.gz"), compress = "gz")
+# agg_stats <- mc_nests_small %>% 
+#   select(-data) %>% 
+#   unnest(predictions) %>% 
+#   write_rds(file = paste0(output_dir, "mc_agg_stats_pcgl.gz"), compress = "gz")
 
 
 test <- agg_stats %>% 
@@ -1222,7 +1223,7 @@ output_dir <- "~/../../capstone/climatree/output/new-output/"
 
 
 # 1. Site-level regressions
-flm_df <- read_csv(paste0(output_dir, "site_pet_cwd_std_augmented_pcgl.csv")) 
+flm_df <- read_csv(paste0(output_dir, "site_pet_cwd_std_augmented_pila.csv")) 
 
 # 2. Species range maps
 range_file <- paste0(data_dir, 'merged_ranges_dissolve.shp')
@@ -1247,7 +1248,7 @@ site_smry <- site_smry %>%
 #   left_join(sp_info, by = c("species_id"))
 
 # 5. Prediction rasters
-sp_predictions <- read_rds(paste0(output_dir, "sp_rwi_pipo.gz"))
+sp_predictions <- read_rds(paste0(output_dir, "sp_rwi_pila.gz"))
 # rwi_list <- list.files(paste0(output_dir, "sp_rwi_pipo.gz"), pattern = ".gz", full.names = TRUE)
 # sp_predictions <- do.call('rbind', lapply(rwi_list, readRDS))
 
@@ -1267,7 +1268,7 @@ sp_predictions <- read_rds(paste0(output_dir, "sp_rwi_pipo.gz"))
 flm_df %>% group_by(species_id) %>% tally() %>% arrange(desc(n))
 
 #spp_code <- 'pcgl'
-spp_code <- "pcgl"
+spp_code <- "pila"
 
 
 trim_df <- flm_df %>% 
@@ -1358,24 +1359,19 @@ high_color <- "#404788"
     
     spp_predictions <- spp_predictions %>% 
       select(x, y, cwd_sens, rwi_pred_change_mean)
-    #spp_predictions <- spp_predictions %>%
-    #select(x, y, cwd_sens, rwi_pred_change_mean)
     
-    # create rasters for each species to save
-    # v <- vect(spp_predictions, geom = c("x", "y"), crs = "EPSG:4326")
-    # r <- rast(v, res = 0.5) 
-    #rasterized_raster <- rasterize(v, r, field = "cwd_sens")
-    
+    spp_predictions <- spp_predictions %>%
+    select(x, y, cwd_sens, rwi_pred_change_mean)
     
     # save final tables in new final_output directory
-    #write_rds(spp_predictions, paste0(output_dir, "spp_predictions_pcgl_old.rds"))
+    #write_rds(spp_predictions, paste0(output_dir, "spp_predictions_pcgl.rds"))
     
     ### Map of CWD sensitivity
     cwd_sens_map <- ggplot() +
       geom_sf(data = world) +
       geom_raster(data = spp_predictions %>% drop_na(), aes(x = x, y = y, fill = cwd_sens)) +
       #theme_bw(base_size = 22)+
-      theme(legend.position = c(.18,.15))+
+      theme(legend.position = c(.5,.15))+
       ylab("Latitude")+
       xlab("Longitude")+
       guides(fill=guide_legend("Sens."))+
@@ -1436,7 +1432,7 @@ high_color <- "#404788"
       guides(fill=guide_legend(title="Δ RWI"))+
       coord_sf(xlim = lon_lims, ylim = lat_lims, expand = FALSE) +
       scale_x_continuous(breaks=seq(-120,100,10)) +
-      theme(legend.position = c(.18,.15),
+      theme(legend.position = c(.5,.15),
             # axis.text.x=element_text(size=base_text_size - 6),
             # axis.text.y=element_text(size = base_text_size - 6),
             axis.title.x=element_blank(),

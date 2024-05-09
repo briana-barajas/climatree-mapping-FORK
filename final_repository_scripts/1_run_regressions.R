@@ -22,73 +22,89 @@
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Package imports --------------------------------------------------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-library(MASS)
-library(tidyverse)
-library(broom)
-library(purrr)
-library(margins)
-library(tidylog)
-library(fixest)
-library(gstat)
-library(sf)
-library(units)
-library(dtplyr)
-library(marginaleffects)
+# library(MASS)
+# library(tidyverse)
+# library(broom)
+# library(purrr)
+# library(margins)
+# library(tidylog)
+# library(fixest)
+# library(gstat)
+# library(sf)
+# library(units)
+# library(dtplyr)
+# library(marginaleffects)
+# library(fixest)
+# # library(raster)
+# library(sp)
+# library(sf)
+# library(rnaturalearth)
+# library(rnaturalearthdata)
+# library(patchwork)
+# library(tidyverse)
+# library(dtplyr)
+# library(prediction)
+# library(tictoc)
+# library(furrr)
+# library(snow)
+# library(profvis)
+# library(tmap)
+# library(tidylog)
+# set.seed(5597)
+# 
+# select <- dplyr::select
+# 
+# n_mc <- 1000
+# 
+# #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# # Import data --------------------------------------------------------
+# #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# ### Define path
+#  data_dir <- "~/../../capstone/climatree/raw_data/"
+#  output_dir <- "~/../../capstone/climatree/output/new-output/"
+# 
+#  # 1. Site-level regressions
+#  flm_df <- read_csv(paste0(output_dir, 'site_pet_cwd_std.csv'))
+# 
+#  # 2. Historic site-level climate
+#  ave_site_clim <- read_rds(paste0(output_dir, "site_ave_clim.gz"))
+#  flm_df <- flm_df %>%
+#    left_join(ave_site_clim, by = c("collection_id"))
+# 
+#  # 3. Site information
+#  site_df <- read_csv(paste0(data_dir, 'site_summary.csv'))
+#  site_df <- site_df %>%
+#    select(collection_id, sp_id, latitude, longitude)
+#  site_df <- site_df %>%
+#    rename(species_id = sp_id) %>%
+#    mutate(species_id = str_to_lower(species_id))
+# 
+#  # # 4. Species information
+#  sp_info <- read_csv(paste0(data_dir, 'species_metadata.csv'))
+#  sp_info <- sp_info %>%
+#    select(species_id, genus, gymno_angio, family)
+#  site_df <- site_df %>%
+#    left_join(sp_info, by = "species_id")
+# 
+#  # Merge back into main flm_df
+#  flm_df <- flm_df %>%
+#    left_join(site_df, by = "collection_id") %>%
+#    filter(species_id %in% c("pcgl", "psme", "pisy")) # <-------------------------- can choose species to run through script here
+# 
+# # define species_id column to iterate through for for loop
+# spp_code_list <- unique(flm_df$species_id)
 
-set.seed(5597)
-
-select <- dplyr::select
-
-n_mc <- 1000
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# Import data --------------------------------------------------------
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-### Define path
-data_dir <- "~/../../capstone/climatree/raw_data/"
-output_dir <- "~/../../capstone/climatree/output/new-output/"
-
-# 1. Site-level regressions
-flm_df <- read_csv(paste0(output_dir, 'site_pet_cwd_std.csv'))
-
-# 2. Historic site-level climate
-ave_site_clim <- read_rds(paste0(output_dir, "site_ave_clim.gz"))
-flm_df <- flm_df %>% 
-  left_join(ave_site_clim, by = c("collection_id"))
-
-# 3. Site information
-site_df <- read_csv(paste0(data_dir, 'site_summary.csv'))
-site_df <- site_df %>% 
-  select(collection_id, sp_id, latitude, longitude)
-site_df <- site_df %>% 
-  rename(species_id = sp_id) %>% 
-  mutate(species_id = str_to_lower(species_id))
-
-# # 4. Species information
-sp_info <- read_csv(paste0(data_dir, 'species_metadata.csv'))
-sp_info <- sp_info %>% 
-  select(species_id, genus, gymno_angio, family)
-site_df <- site_df %>% 
-  left_join(sp_info, by = "species_id")
-
-# Merge back into main flm_df
-flm_df <- flm_df %>% 
-  left_join(site_df, by = "collection_id") #%>% 
-  #filter(species_id == ...) <-------------------------- can choose species to run through script here
-
-# define species_id column to iterate through for for loop
-spp_code_list <- flm_df$species_id
+# store flm_df data frame for loop
+original_flm_df <- flm_df
 
 # for loop for iterating through species in flm_df data frame
-for(i in spp_code_list) {
+for(species in spp_code_list) {
   
-  flm_df <- original_flm_df %>% 
-    filter(species_id == i) # filter for only rows with species of interest
+  n_mc <- 1000
   
-  if (nrow(flm_df) == 0) {
-    print(paste0("No data found for species ", i))
-    next
-  }
+  flm_df <- original_flm_df %>% filter(species_id == species)
+  
+  print(nrow(flm_df))
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Prep and trim data -----------------------------------------------------
@@ -124,7 +140,7 @@ flm_df <- flm_df %>%
            (estimate_pet.an>pet_est_bounds[2]))
 
 # Save out full flm_df to simplify downstream scripts and ensure consistency
-flm_df %>% write.csv(paste0(output_dir, "site_pet_cwd_std_augmented_", i, ".csv"))
+flm_df %>% write.csv(paste0(output_dir, "site_pet_cwd_std_augmented_", species, ".csv"))
 
 # Trim outliers
 trim_df <- flm_df %>% 
@@ -338,9 +354,9 @@ block_draw_df <- block_draw_df %>%
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Export first stage draws to pull summary stats -------------------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# block_draw_df %>% 
-#   select(boot_id, collection_id, cwd_coef, pet_coef, int_coef, cwd.spstd, pet.spstd) %>% 
-#   write_rds(paste0(output_dir, "mc_sample_pcgl.gz"), compress = "gz")
+ block_draw_df %>% 
+   select(boot_id, collection_id, cwd_coef, pet_coef, int_coef, cwd.spstd, pet.spstd) %>% 
+   write_rds(paste0(output_dir, "mc_sample_", species, "."), compress = "gz")
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -425,10 +441,10 @@ boot_df <- boot_df %>%
 
 
 ## Save out bootstrapped coefficients
-write_rds(boot_df, paste0(output_dir, "ss_bootstrap_", i, ".rds"))
+write_rds(boot_df, paste0(output_dir, "ss_bootstrap_", species, ".rds"))
 
 
-print(paste0("Processing of tree species ", i, " is complete."))
+print(paste0("Processing of tree species ", species, " is complete."))
 
 
 }

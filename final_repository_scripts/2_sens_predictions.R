@@ -35,21 +35,21 @@ library(snow)
 library(profvis)
 library(tmap)
 library(tidylog)
-
-n_cores <- availableCores()
-future::plan(multisession, workers = n_cores)
-
-my_seed <- 5597
-
-n_mc <- 1000
-
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# Load data --------------------------------------------------------
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# Define path
-data_dir <- "~/../../capstone/climatree/raw_data/"
-output_dir <- "~/../../capstone/climatree/output/new-output/"
+# 
+# n_cores <- availableCores()
+# future::plan(multisession, workers = n_cores)
+# 
+# my_seed <- 5597
+# 
+# n_mc <- 1000
+# 
+# 
+# #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# # Load data --------------------------------------------------------
+# #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# # Define path
+# data_dir <- "~/../../capstone/climatree/raw_data/"
+# output_dir <- "~/../../capstone/climatree/output/new-output/"
 
 # Create output directories
 #out_dir <- paste0(wdir,"2_output/predictions/")
@@ -57,14 +57,23 @@ output_dir <- "~/../../capstone/climatree/output/new-output/"
 #dir.create(file.path(paste0(output_dir, "sp_rwi/")), showWarnings = FALSE)
 # dir.create(file.path(paste0(out_dir, "sp_hot_cells/")), showWarnings = FALSE)
 
+for(species in spp_code_list){
+  
+  n_mc <- 1000
+  n_cores <- availableCores()
+  future::plan(multisession, workers = n_cores)
+  
+  my_seed <- 5597
+  
+
 # 1. Second stage model
-mod_df <- read_rds(paste0(output_dir, "ss_bootstrap_pcgl.rds"))
+mod_df <- read_rds(paste0(output_dir, "ss_bootstrap_", species, ".rds"))
 mod_df <- mod_df %>% 
   rename(iter_idx = boot_id)
 
 # 2. Species-standardized historic and future climate
 sp_clim <- read_rds(paste0(output_dir, "sp_clim_predictions.gz")) %>% 
-  filter(sp_code == "pcgl")
+  filter(sp_code == species)
 species_list <- sp_clim %>% select(sp_code)
             
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -167,10 +176,10 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
   set.seed(my_seed) # Re-setting seed at start of each iteration to ensure interrupted jobs still produce replicable results
   tic()
   
-  print("Starting processing for pcgl")
+  print(paste0("Starting processing for species: ", species))
   
   ## Iterating through each species
-  print(spp_code)
+  #print(spp_code)
   
   print("Calculating sensitivity rasters")
   
@@ -445,7 +454,7 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
    print("Finished joining cmip calculations to sp_predictions")
    
    ## Write out
-   write_rds(sp_predictions, paste0(output_dir, "sp_rwi_pcgl.gz"), compress = "gz")
+   write_rds(sp_predictions, paste0(output_dir, "sp_rwi_", species, ".gz"), compress = "gz")
    
    toc()
    return(agg_stats)
@@ -479,20 +488,22 @@ mc_nests_small <- mc_nests %>%
                                  parallel = TRUE),
                             .f = calc_rwi_quantiles)) 
 
-agg_stats <- mc_nests_small %>% 
-  select(-data) %>% 
-  unnest(predictions) %>% 
-  write_rds(file = paste0(output_dir, "mc_agg_stats_pipo.gz"), compress = "gz")
+}
 
-
-test <- agg_stats %>% 
-  group_by(iter_idx) %>% 
-  summarise(rwi_pred_change = mean(rwi_pred_change))
-test %>%
-  pull(rwi_pred_change) %>% 
-  quantile(c(0.025, 0.5, 0.975))
-
-
+# agg_stats <- mc_nests_small %>% 
+#   select(-data) %>% 
+#   unnest(predictions) %>% 
+#   write_rds(file = paste0(output_dir, "mc_agg_stats_pipo.gz"), compress = "gz")
+# 
+# 
+# test <- agg_stats %>% 
+#   group_by(iter_idx) %>% 
+#   summarise(rwi_pred_change = mean(rwi_pred_change))
+# test %>%
+#   pull(rwi_pred_change) %>% 
+#   quantile(c(0.025, 0.5, 0.975))
+# 
+# 
 
 
 # # Profiling of main function

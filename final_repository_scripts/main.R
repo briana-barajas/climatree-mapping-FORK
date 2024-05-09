@@ -1,22 +1,126 @@
 # Load necessary libraries
 library(dplyr)
+library(MASS)
+library(tidyverse)
+library(broom)
+library(purrr)
+library(margins)
+library(tidylog)
+library(fixest)
+library(gstat)
+library(sf)
+library(units)
+library(dtplyr)
+library(marginaleffects)
+library(dbplyr)
+library(RSQLite)
+library(ggplot2)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(rgeos)
+library(stringr)
+library(raster)
+library(rgdal)
+library(viridis)
+library(patchwork)
+library(effects)
+library(dplR)
+library(terra)
+select <- dplyr::select
+
 
 ### Define path
 data_dir <- "~/../../capstone/climatree/raw_data/"
 output_dir <- "~/../../capstone/climatree/output/new-output/"
 
-# Read in the data frame
-df <- read.csv("your_data_frame.csv")
+###########################################
+###########################################
 
-# Extract unique species codes
-species_code_list <- unique(df$species_code)
+# START Script 1 Pre-Processing steps
+
+###########################################
+###########################################
+
+
+# 1. Site-level regressions
+flm_df <- read_csv(paste0(output_dir, 'site_pet_cwd_std.csv'))
+
+# 2. Historic site-level climate
+ave_site_clim <- read_rds(paste0(output_dir, "site_ave_clim.gz"))
+flm_df <- flm_df %>% 
+  left_join(ave_site_clim, by = c("collection_id"))
+
+# 3. Site information
+site_df <- read_csv(paste0(data_dir, 'site_summary.csv'))
+site_df <- site_df %>% 
+  select(collection_id, sp_id, latitude, longitude)
+site_df <- site_df %>% 
+  rename(species_id = sp_id) %>% 
+  mutate(species_id = str_to_lower(species_id))
+
+# # 4. Species information
+sp_info <- read_csv(paste0(data_dir, 'species_metadata.csv'))
+sp_info <- sp_info %>% 
+  select(species_id, genus, gymno_angio, family)
+site_df <- site_df %>% 
+  left_join(sp_info, by = "species_id")
+
+# Merge back into main flm_df
+flm_df <- flm_df %>% 
+  left_join(site_df, by = "collection_id") %>% 
+  filter(species_id %in% c("pial", "pila")) # <-------------------------- can choose species to run through script here
+
+# define species_id column to iterate through for for loop
+spp_code_list <- unique(flm_df$species_id)
+
+assign("spp_code_list", spp_code_list, envir = .GlobalEnv)
+
+###########################################
+###########################################
+
+# END Script 1 Pre-Processing steps
+
+##########################################
+##########################################
+
+###########################################
+###########################################
+
+# START Script 3 Pre-Processing step
+
+##########################################
+##########################################
+
+base_text_size = 12
+theme_set(
+  theme_bw(base_size = base_text_size)+
+    theme(panel.grid.major = element_blank(), 
+          panel.grid.minor = element_blank(),
+          # text=element_text(family ="Helvetica"),
+          panel.background = element_rect(fill='transparent'), 
+          plot.background = element_rect(fill='transparent', color=NA), 
+          legend.background = element_rect(fill='transparent')))
+
+pt_size = .pt
+
+###########################################
+###########################################
+
+# END Script 3 Pre-Processing step
+
+##########################################
+##########################################
 
 # Set the file paths for the three scripts
-script1_path <- "path/to/script1.R"
-script2_path <- "path/to/script2.R"
-script3_path <- "path/to/script3.R"
+script1_path <- "final_repository_scripts/1_run_regressions.R"
+script2_path <- "final_repository_scripts/2_sens_predictions.R"
+script3_path <- "final_repository_scripts/3_mapping.R"
 
-# Source the three scripts in the desired order
+# Source the three scripts for the current species
 source(script1_path, local = TRUE)
 source(script2_path, local = TRUE)
 source(script3_path, local = TRUE)
+  
+
+
+

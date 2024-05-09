@@ -178,10 +178,10 @@ clim_tc <- resample(clim_tc, cwd_cmip_start, method = "bilinear")
 # #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # # Visually inspect data -----------------------------------------------
 # #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
- tmap_mode("view")
- tm_shape(clim_tc) +
-   tm_raster() +
-   tm_facets(as.layers = TRUE)
+ # tmap_mode("view")
+ # tm_shape(clim_tc) +
+ #   tm_raster() +
+ #   tm_facets(as.layers = TRUE)
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Summarize species niches -----------------------------------------------
@@ -411,31 +411,31 @@ sp_cmip_clim <- sp_cmip_clim %>%
 
 
 # ## Check final result as raster
- species = "pcgl"
- test_clim <- (sp_cmip_clim %>% filter(sp_code == species) %>% pull(clim_cmip_sp))[[1]]
- crs_template <- crs(cwd_cmip_end)
- raster_template <- cwd_cmip_end %>% as.data.frame(xy = TRUE) %>% select(x,y)
- test_clim <- raster_template %>%
-   left_join(test_clim, by = c("x", "y"))
- test_clim <- rasterFromXYZ(test_clim, crs = crs_template)
- range <- range_sf %>% filter(sp_code == species)
- tmap_mode("view")
+#  species = "pcgl"
+#  test_clim <- (sp_cmip_clim %>% filter(sp_code == species) %>% pull(clim_cmip_sp))[[1]]
+#  crs_template <- crs(cwd_cmip_end)
+#  raster_template <- cwd_cmip_end %>% as.data.frame(xy = TRUE) %>% select(x,y)
+#  test_clim <- raster_template %>%
+#    left_join(test_clim, by = c("x", "y"))
+#  test_clim <- rasterFromXYZ(test_clim, crs = crs_template)
+#  range <- range_sf %>% filter(sp_code == species)
+#  tmap_mode("view")
+# # 
+#  tm_shape(test_clim$cwd_cmip_end1) +
+#    tm_raster(palette = "-RdYlGn") +
+#    tm_facets(as.layers = TRUE) +
+#    tm_shape(range) + 
+#    tm_fill(col = "lightblue")
+# # 
+#  tm_shape(test_clim$cwd_cmip_end1) +
+#    tm_raster(palette = "-RdYlGn") +
+#    tm_facets(as.layers = TRUE) +
+#    tm_shape(test_clim$cwd_cmip_start1) +
+#    tm_raster(palette = "-RdYlGn") +
+#    tm_facets(as.layers = TRUE) +
+#    tm_shape(range) + 
+#    tm_fill(col = "lightblue")
 # 
- tm_shape(test_clim$cwd_cmip_end1) +
-   tm_raster(palette = "-RdYlGn") +
-   tm_facets(as.layers = TRUE) +
-   tm_shape(range) + 
-   tm_fill(col = "lightblue")
-# 
- tm_shape(test_clim$cwd_cmip_end1) +
-   tm_raster(palette = "-RdYlGn") +
-   tm_facets(as.layers = TRUE) +
-   tm_shape(test_clim$cwd_cmip_start1) +
-   tm_raster(palette = "-RdYlGn") +
-   tm_facets(as.layers = TRUE) +
-   tm_shape(range) + 
-   tm_fill(col = "lightblue")
-
 
 ## Export predictions
 write_rds(sp_cmip_clim, paste0(output_dir, "sp_clim_predictions.", compress = "gz"))

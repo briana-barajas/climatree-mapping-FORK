@@ -7,33 +7,33 @@
 #===============================================================================
 # 1) Pkg imports ---------
 #===============================================================================
-library(tidyverse)
-library(dbplyr)
-library(RSQLite)
-library(ggplot2)
-library(rnaturalearth)
-library(rnaturalearthdata)
-library(sf)
-library(rgeos)
-library(stringr)
-library(raster)
-library(rgdal)
-library(viridis)
-library(patchwork)
-library(effects)
-library(dplR)
-library(terra)
-select <- dplyr::select
-
-
+# library(tidyverse)
+# library(dbplyr)
+# library(RSQLite)
+# library(ggplot2)
+# library(rnaturalearth)
+# library(rnaturalearthdata)
+# library(sf)
+# library(rgeos)
+# library(stringr)
+# library(raster)
+# library(rgdal)
+# library(viridis)
+# library(patchwork)
+# library(effects)
+# library(dplR)
+# library(terra)
+# select <- dplyr::select
+# 
+# 
 base_text_size = 12
 theme_set(
   theme_bw(base_size = base_text_size)+
-    theme(panel.grid.major = element_blank(), 
+    theme(panel.grid.major = element_blank(),
           panel.grid.minor = element_blank(),
           # text=element_text(family ="Helvetica"),
-          panel.background = element_rect(fill='transparent'), 
-          plot.background = element_rect(fill='transparent', color=NA), 
+          panel.background = element_rect(fill='transparent'),
+          plot.background = element_rect(fill='transparent', color=NA),
           legend.background = element_rect(fill='transparent')))
 
 pt_size = .pt
@@ -45,9 +45,11 @@ pt_size = .pt
 data_dir <- "~/../../capstone/climatree/raw_data/"
 output_dir <- "~/../../capstone/climatree/output/new-output/"
 
-
+for(species in spp_code_list){
+  
+  
 # 1. Site-level regressions
-flm_df <- read_csv(paste0(output_dir, "site_pet_cwd_std_augmented_pcgl.csv")) 
+flm_df <- read_csv(paste0(output_dir, "site_pet_cwd_std_augmented_", species, ".csv")) 
 
 # 2. Species range maps
 range_file <- paste0(data_dir, 'merged_ranges_dissolve.shp')
@@ -72,7 +74,7 @@ site_smry <- site_smry %>%
 #   left_join(sp_info, by = c("species_id"))
 
 # 5. Prediction rasters
-sp_predictions <- read_rds(paste0(output_dir, "sp_rwi_pipo.gz"))
+sp_predictions <- read_rds(paste0(output_dir, "sp_rwi_", species, ".gz"))
 # rwi_list <- list.files(paste0(output_dir, "sp_rwi_pipo.gz"), pattern = ".gz", full.names = TRUE)
 # sp_predictions <- do.call('rbind', lapply(rwi_list, readRDS))
 
@@ -92,7 +94,7 @@ sp_predictions <- read_rds(paste0(output_dir, "sp_rwi_pipo.gz"))
 flm_df %>% group_by(species_id) %>% tally() %>% arrange(desc(n))
 
 #spp_code <- 'pcgl'
-spp_code <- "pcgl"
+spp_code <- species
 
 
 trim_df <- flm_df %>% 
@@ -183,17 +185,13 @@ spp_predictions <- spp_predictions %>% filter(abs(cwd_hist) < 2)  ## TODO - Figu
     
 spp_predictions <- spp_predictions %>% 
   select(x, y, cwd_sens, rwi_pred_change_mean)
-#spp_predictions <- spp_predictions %>%
-#select(x, y, cwd_sens, rwi_pred_change_mean)
-    
-# create rasters for each species to save
-# v <- vect(spp_predictions, geom = c("x", "y"), crs = "EPSG:4326")
-# r <- rast(v, res = 0.5) 
-#rasterized_raster <- rasterize(v, r, field = "cwd_sens")
-    
+
+# only save necessary columns for mapping
+spp_predictions <- spp_predictions %>%
+select(x, y, cwd_sens, rwi_pred_change_mean)
     
 # save final tables in new final_output directory
-#write_rds(spp_predictions, paste0(output_dir, "spp_predictions_pcgl_old.rds"))
+write_csv(spp_predictions, paste0(output_dir, "spp_predictions_", species, ".csv"))
     
 ### Map of CWD sensitivity
 cwd_sens_map <- ggplot() +
@@ -271,3 +269,4 @@ rwi_map <- ggplot() +
         legend.text=element_text(size=base_text_size - 4))
 rwi_map
     
+}
