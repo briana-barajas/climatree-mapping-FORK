@@ -31,7 +31,7 @@ select <- dplyr::select
 
 ### Define path
 data_dir <- "~/../../capstone/climatree/raw_data/"
-input_dir <- "~/../../capstone/climatree/output/input/"
+input_dir <- "~/../../capstone/climatree/input/external/"
 output_dir <- "~/../../capstone/climatree/output/intermediate-output/"
 
 ###########################################
@@ -68,10 +68,11 @@ site_df <- site_df %>%
   left_join(sp_info, by = "species_id")
 
 # Merge back into main flm_df
-flm_df <- flm_df %>% 
-  left_join(site_df, by = "collection_id") %>% 
-  filter(species_id %in% c("psme", "pcgl", "pisy", "pcab", "tsme", "abal", "quro",
-                           "lasi", "piec", "pifl", "laly", "pist", "pial", "quve")) # <-------------------------- can choose species to run through script here
+ flm_df <- flm_df %>% 
+   left_join(site_df, by = "collection_id") %>% 
+   filter(species_id %in% c("lala" ))#"psme", "pcgl", "pisy", "pcab", "tsme", "abal", "quro",
+                            #"lasi", "piec", "pifl", "laly", "pist", "pial", "quve",
+                            # "pipo", "pire", ?"fasy", )) # <-------------------------- can choose species to run through script here
 
 # define species_id column to iterate through for for loop
 spp_code_list <- unique(flm_df$species_id)
