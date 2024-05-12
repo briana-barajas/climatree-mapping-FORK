@@ -72,7 +72,7 @@ mod_df <- mod_df %>%
   rename(iter_idx = boot_id)
 
 # 2. Species-standardized historic and future climate
-sp_clim <- read_rds(paste0(output_dir, "sp_clim_predictions.gz")) %>% 
+sp_clim <- read_rds(paste0(input_dir, "sp_clim_predictions.gz")) %>% 
   filter(sp_code == species)
 species_list <- sp_clim %>% select(sp_code)
             

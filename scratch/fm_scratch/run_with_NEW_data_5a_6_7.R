@@ -67,7 +67,6 @@ n_mc <- 1000
 data_dir <- "~/../../capstone/climatree/raw_data/"
 output_dir <- "~/../../capstone/climatree/output/new-output/"
 
-pcgl_psme_pisy %>% write_csv(paste0(output_dir, "pcgl_psme_pisy.csv"))
 # 1. Site-level regressions
 flm_df <- read_csv(paste0(output_dir, 'site_pet_cwd_std.csv'))
 
@@ -97,7 +96,7 @@ flm_df <- flm_df %>%
 
 #Filter for species code pcgl (White Spruce)
 flm_df <- flm_df %>% 
-  filter(species_id == "pcgl")
+  filter(species_id == "pila")
 
 
 
@@ -135,7 +134,7 @@ flm_df <- flm_df %>%
            (estimate_pet.an>pet_est_bounds[2]))
 
 # Save out full flm_df to simplify downstream scripts and ensure consistency
-flm_df %>% write.csv(paste0(output_dir, "site_pet_cwd_std_augmented_pcgl.csv"))
+flm_df %>% write.csv(paste0(output_dir, "site_pet_cwd_std_augmented_pila.csv"))
 
 # Trim outliers
 trim_df <- flm_df %>% 
@@ -351,7 +350,7 @@ block_draw_df <- block_draw_df %>%
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 block_draw_df %>% 
   select(boot_id, collection_id, cwd_coef, pet_coef, int_coef, cwd.spstd, pet.spstd) %>% 
-  write_rds(paste0(output_dir, "mc_sample_pcgl."), compress = "gz")
+  write_rds(paste0(output_dir, "mc_sample_pila."), compress = "gz")
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -436,7 +435,7 @@ boot_df <- boot_df %>%
 
 
 ## Save out bootstrapped coefficients
-write_rds(boot_df, paste0(output_dir, "ss_bootstrap_pcgl.rds"))
+write_rds(boot_df, paste0(output_dir, "ss_bootstrap_pila.rds"))
 
 
 
@@ -913,7 +912,7 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
    print("Finished joining cmip calculations to sp_predictions")
    
    ## Write out
-   #write_rds(sp_predictions, paste0(output_dir, "sp_rwi_pcgl.gz"), compress = "gz")
+   write_rds(sp_predictions, paste0(output_dir, "sp_rwi_pila.gz"), compress = "gz")
    
    toc()
    return(agg_stats)
@@ -1364,7 +1363,7 @@ high_color <- "#404788"
     select(x, y, cwd_sens, rwi_pred_change_mean)
     
     # save final tables in new final_output directory
-    #write_rds(spp_predictions, paste0(output_dir, "spp_predictions_pcgl.rds"))
+    write_rds(spp_predictions, paste0(output_dir, "spp_predictions_pila.rds"))
     
     ### Map of CWD sensitivity
     cwd_sens_map <- ggplot() +

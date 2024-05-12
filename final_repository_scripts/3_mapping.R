@@ -42,21 +42,24 @@ pt_size = .pt
 # 2) Data imports  ---------
 #===============================================================================
 ### Define path
-data_dir <- "~/../../capstone/climatree/raw_data/"
-output_dir <- "~/../../capstone/climatree/output/new-output/"
+# data_dir <- "~/../../capstone/climatree/raw_data/"
+# input_dir <- "~/../../capstone/climatree/output/new-output/"
+#output_dir <- "~/../../capstone/climatree/output/intermediate-output/"
 
 for(species in spp_code_list){
   
+  # define output directory
+  output_dir <- "~/../../capstone/climatree/output/intermediate-output/"
   
 # 1. Site-level regressions
 flm_df <- read_csv(paste0(output_dir, "site_pet_cwd_std_augmented_", species, ".csv")) 
 
 # 2. Species range maps
-range_file <- paste0(data_dir, 'merged_ranges_dissolve.shp')
+range_file <- paste0(input_dir, 'merged_ranges_dissolve.shp')
 range_sf <- st_read(range_file)
 
 # 3. Site information
-site_smry <- read_csv(paste0(data_dir, 'site_summary.csv'))
+site_smry <- read_csv(paste0(input_dir, 'site_summary.csv'))
 site_smry <- site_smry %>% 
   select(collection_id, sp_id, latitude, longitude) %>% 
   mutate(species_id = tolower(sp_id)) %>% 
@@ -183,14 +186,19 @@ map <- ggplot(trim_df, aes(x = Longitude, y = Latitude))
 #===============================================================================
 spp_predictions <- spp_predictions %>% filter(abs(cwd_hist) < 2)  ## TODO - Figure out correct cut-off for predictions
     
-spp_predictions <- spp_predictions %>% 
-  select(x, y, cwd_sens, rwi_pred_change_mean)
-
 # only save necessary columns for mapping
 spp_predictions <- spp_predictions %>%
-select(x, y, cwd_sens, rwi_pred_change_mean)
-    
+  select(x, y, cwd_sens, rwi_pred_change_mean) %>% 
+  mutate(species_code = species)
+
+# define directory to store final files
+output_dir <- "~/../../capstone/climatree/output/final-output/"
+
+# append the current spp_predictions to the combined data frame
+combined_predictions <- rbind(combined_predictions, spp_predictions)
+
 # save final tables in new final_output directory
+write_csv(combined_predictions, paste0(output_dir, "combined_predictions.csv"))
 write_csv(spp_predictions, paste0(output_dir, "spp_predictions_", species, ".csv"))
     
 ### Map of CWD sensitivity
@@ -214,7 +222,7 @@ cwd_sens_map <- ggplot() +
         legend.title=element_text(size=base_text_size - 2), 
         legend.text=element_text(size=base_text_size - 4))+
   theme()
-cwd_sens_map
+print(cwd_sens_map)
     
 #===============================================================================
 # Step 5: Prediction of RWI change  ---------
@@ -267,6 +275,6 @@ rwi_map <- ggplot() +
         legend.key.size = unit(8, "pt"),
         legend.title=element_text(size=base_text_size - 2), 
         legend.text=element_text(size=base_text_size - 4))
-rwi_map
+print(rwi_map)
     
 }
