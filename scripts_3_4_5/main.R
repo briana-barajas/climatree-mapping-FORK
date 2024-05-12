@@ -41,8 +41,6 @@ output_dir <- "~/../../capstone/climatree/output/intermediate-output/"
 
 ###########################################
 ###########################################
-dir <- "~/../../capstone/climatree/output/final-output/"
-combined <- read_csv(paste0(dir, 'combined_predictions.csv'))
 
 # 1. Site-level regressions
 flm_df <- read_csv(paste0(input_dir, 'site_pet_cwd_std.csv'))
@@ -70,9 +68,9 @@ site_df <- site_df %>%
 # Merge back into main flm_df
  flm_df <- flm_df %>% 
    left_join(site_df, by = "collection_id") %>% 
-   filter(species_id %in% c("lala" ))#"psme", "pcgl", "pisy", "pcab", "tsme", "abal", "quro",
-                            #"lasi", "piec", "pifl", "laly", "pist", "pial", "quve",
-                            # "pipo", "pire", ?"fasy", )) # <-------------------------- can choose species to run through script here
+   filter(species_id %in% c("psme", "pcgl", "pisy", "pcab", "tsme", "abal", "quro",
+                            "lasi", "piec", "pifl", "laly", "pist", "pial", "quve",
+                             "pipo", "pire", ?"fasy", )) # <-------------------------- can choose species to run through script here
 
 # define species_id column to iterate through for for loop
 spp_code_list <- unique(flm_df$species_id)
@@ -90,33 +88,6 @@ combined_predictions <- data.frame()
 ##########################################
 ##########################################
 
-###########################################
-###########################################
-
-# START Script 3 Pre-Processing step
-
-##########################################
-##########################################
-
-base_text_size = 12
-theme_set(
-  theme_bw(base_size = base_text_size)+
-    theme(panel.grid.major = element_blank(), 
-          panel.grid.minor = element_blank(),
-          # text=element_text(family ="Helvetica"),
-          panel.background = element_rect(fill='transparent'), 
-          plot.background = element_rect(fill='transparent', color=NA), 
-          legend.background = element_rect(fill='transparent')))
-
-pt_size = .pt
-
-###########################################
-###########################################
-
-# END Script 3 Pre-Processing step
-
-##########################################
-##########################################
 
 # Set the file paths for the three scripts
 script1_path <- "final_repository_scripts/1_run_regressions.R"
