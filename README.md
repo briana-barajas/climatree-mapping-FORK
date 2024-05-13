@@ -1,6 +1,8 @@
 # Mapping Repository 🌲
 Repository for data wrangling and spatial analysis
 
+* to access original scripts before modification by this project, vist Treeconomics GitHub Repository: https://github.com/rheilmayr/Treeconomics *
+
 ## Data and Term Definitions
 
 Data:
@@ -9,15 +11,17 @@ Raw data file "essential_cwd.csv" can be accessed from the International Tree Ri
 
 Raw climate data files "TerraClimate19611990_pet.nc" and "TerraClimate19611990_def.nc" can be accessed from the TerraClimate website: https://www.climatologylab.org/terraclimate.html
 
+* For access to other data sources, contact Dr. Joan Dudney *
+
 Definitions of key terms:
 
 **CWD(climatic water deficit):** A measure of how much less water availability there will be in the future
 
 **PET(potential evapotranspiration):** The maximum amount of growth a tree will have, when water is unlimited
 
-**sensitivity:** The partial effect of CWD on tree growth (the direction and degree to which trees will react to changes in water availability)
+**Sensitivity:** The partial effect of CWD on tree growth (the direction and degree to which trees will react to changes in water availability)
 
-**vulnerability:** Combining sensitivity values with predictions of CWD change (using CMIP5) to predict how climate change will effect future tree growth. 
+**Vulnerability:** Combining sensitivity values with predictions of CWD change (using CMIP5) to predict how climate change will effect future tree growth. 
 
 **Coupled Model Intercomparison Project Phase 5 (CMIP5):** An ensemble of climate prediction models used to predict CWD change between historic (1970-2000) and end-of-century (2090-2100)  
 
