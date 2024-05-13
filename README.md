@@ -27,7 +27,7 @@ Definitions of key terms:
 
 **Coupled Model Intercomparison Project Phase 5 (CMIP5):** An ensemble of climate prediction models used to predict CWD change between historic (1970-2000) and end-of-century (2090-2100)  
 
-## This repository has 5 main Rmarkdown files:
+## This repository has 7 Rmarkdown files (scripts 1-5 were modified from ongoing research by Dr. Joan Dudney):
 
 * scripts 1 and 2 were modified to use new TerraClimate data and outputs were used in scripts 3, 4 and 5
 
@@ -37,13 +37,15 @@ Definitions of key terms:
 
 * scripts 3, 4 and 5 were modified to run each species through individually in order to create species-level maps
 
+**main.R** --> This script was created to make the process of running scripts 3,4 and 5 easier. By running this one script, scripts 3, 4 and 5 will be run for each species selected.
+
 **3_run_regressions.R** --> This script species-level regressions to analyze the impact of historical climate on weather sensitivity (combines CMIP5 data with TerraClimate data)
 
 **4_sens_predictions.R** --> This script creates predictions of how climate change will impact growth across each species range (vulnerability). 
 
 **5_mapping.R** --> This script creates sensitivity and vulnerability maps for targeted species. 
 
-* create_top_species.R provides code for how we selected the most sampled species (by number of trees in the ITRDB)
+**create_top_species.R** --> provides code for how we selected the most sampled species (by number of trees in the ITRDB)
 
 ## Repository Structure:
 ```
