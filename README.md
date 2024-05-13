@@ -5,7 +5,7 @@ Repository for data wrangling and spatial analysis
 
 ## Data and Term Definitions
 
-Data:
+<u>Data:<u>
 
 Raw data file "essential_cwd.csv" can be accessed from the International Tree Ring Data Bank (ITRDB): https://www.ncei.noaa.gov/products/paleoclimatology/tree-ring
 
