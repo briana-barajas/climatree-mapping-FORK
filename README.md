@@ -5,7 +5,7 @@ Repository for data wrangling and spatial analysis
 
 Contributors: Dr. Joan Dudney, Dr. Robert Heilmeyer, Dr. Frances C. Moore
 
-## Data and Term Definitions
+## Data Access and Term Definitions
 
 <u>Data:<u>
 
