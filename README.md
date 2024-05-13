@@ -1,6 +1,8 @@
 # Mapping Repository
 Repository for data wrangling and spatial analysis
 
+Data:
+
 Definitions of key terms:
 
 **sensitivity:** The partial effect of CWD on tree growth (the direction and degree to which trees will react to changes in water availability)
