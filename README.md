@@ -1,7 +1,9 @@
 # Mapping Repository 🌲
 Repository for data wrangling and spatial analysis
 
-* to access original scripts before modification by this project, vist Treeconomics GitHub Repository: https://github.com/rheilmayr/Treeconomics 
+* to access original scripts before modification by this project, vist Treeconomics GitHub Repository: https://github.com/rheilmayr/Treeconomics
+
+Contributors: Dr. Joan Dudney, Dr. Robert Heilmeyer, Dr. Frances C. Moore
 
 ## Data and Term Definitions
 
