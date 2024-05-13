@@ -25,4 +25,27 @@ Definitions of key terms:
 
 **5_mapping.R** --> This script creates sensitivity and vulnerability maps for targeted species. 
 
+Repository Structure:
+```
+├── climatree-mapping-repo.Rproj
+├── fm_scratch
+│   └── fm_scratch
+│       ├── run_with_NEW_data_3b_4a.R
+│       ├── run_with_NEW_data_5a_6_7.R
+│       ├── run_with_OLD_data_3b_4a.R
+│       ├── run_with_OLD_data_5a_6_7.R
+│       └── subset_species_no_for_loop_test.R
+├── prep_scripts
+│   ├── 2-spp-list.R
+│   └── create_top_species.R
+├── README.md
+├── scripts_1_2
+│   ├── 1_climate_niche.R
+│   └── 2_plot_level_regression.R
+└── scripts_3_4_5
+    ├── 3_run_regressions.R
+    ├── 4_sens_predictions.R
+    ├── 5_mapping.R
+    └── main.R
 
+```
