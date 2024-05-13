@@ -1,7 +1,7 @@
 # Mapping Repository 🌲
 Repository for data wrangling and spatial analysis
 
-* to access original scripts before modification by this project, vist Treeconomics GitHub Repository: https://github.com/rheilmayr/Treeconomics *
+* to access original scripts before modification by this project, vist Treeconomics GitHub Repository: https://github.com/rheilmayr/Treeconomics 
 
 ## Data and Term Definitions
 
@@ -11,7 +11,7 @@ Raw data file "essential_cwd.csv" can be accessed from the International Tree Ri
 
 Raw climate data files "TerraClimate19611990_pet.nc" and "TerraClimate19611990_def.nc" can be accessed from the TerraClimate website: https://www.climatologylab.org/terraclimate.html
 
-* For access to other data sources, contact Dr. Joan Dudney *
+* For access to other data sources, contact Dr. Joan Dudney 
 
 Definitions of key terms:
 
@@ -27,7 +27,7 @@ Definitions of key terms:
 
 ## This repository has 5 Rmarkdown files:
 
-**1_climate_niche.R** --> This markdown document explores how historical climate impacts weather sensitivity of tree species. 
+***1_climate_niche.R** --> This markdown document explores how historical climate impacts weather sensitivity of tree species. 
 
 **2_plot_level_regression.R** --> This document uses plot-level regressions of RWI sensitivity to annual weather variations. 
 
