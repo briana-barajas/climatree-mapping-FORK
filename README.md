@@ -1,4 +1,4 @@
-# Mapping Repository
+# Mapping Repository 🌲
 Repository for data wrangling and spatial analysis
 
 Data:
@@ -11,15 +11,11 @@ Definitions of key terms:
 
 **Coupled Model Intercomparison Project Phase 5 (CMIP5):** An ensemble of climate prediction models used to predict CWD change between historic (1970-2000) and end-of-century (2090-2100)  
 
-## This repository has 5 Rmarkdown files in 2 categories:
-
-[Category 1:] First 2 files that were modified to run with updated TerraClimate data. The outputs from these files were used as inputs in the Category 2 files below.
+## This repository has 5 Rmarkdown files:
 
 **1_climate_niche.R** --> This markdown document explores how historical climate impacts weather sensitivity of tree species. 
 
 **2_plot_level_regression.R** --> This document uses plot-level regressions of RWI sensitivity to annual weather variations. 
-
-[Category 2:] 3 files of scripts modified from a global to a species-level analysis of tree sensitivity and vulnerability.
 
 **3_run_regressions.R** --> This script species-level regressions to analyze the impact of historical climate on weather sensitivity (combines CMIP5 data with TerraClimate data)
 
@@ -29,25 +25,15 @@ Definitions of key terms:
 
 Repository Structure:
 ```
-├── climatree-mapping-repo.Rproj
-├── fm_scratch
-│   └── fm_scratch
-│       ├── run_with_NEW_data_3b_4a.R
-│       ├── run_with_NEW_data_5a_6_7.R
-│       ├── run_with_OLD_data_3b_4a.R
-│       ├── run_with_OLD_data_5a_6_7.R
-│       └── subset_species_no_for_loop_test.R
-├── prep_scripts
-│   ├── 2-spp-list.R
-│   └── create_top_species.R
-├── README.md
-├── scripts_1_2
-│   ├── 1_climate_niche.R
-│   └── 2_plot_level_regression.R
-└── scripts_3_4_5
-    ├── 3_run_regressions.R
-    ├── 4_sens_predictions.R
-    ├── 5_mapping.R
-    └── main.R
+climatree-mapping-repo
+├── main.R
+├── 1_climate_niche.R
+├── 2_plot_level_regressions.R
+├── 3_run_regressions.R
+├── 4_sens_predictions.R
+├── 5_mapping.R
+└── prep_scripts
+    ├── 2_spp_list.R
+    └── create_top_species.R
 
 ```
