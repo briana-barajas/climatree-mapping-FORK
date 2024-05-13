@@ -11,13 +11,13 @@ Definitions of key terms:
 
 ## This repository has 5 Rmarkdown files in 2 categories:
 
-###[Category 1:] First 2 files that were modified to run with updated TerraClimate data. The outputs from these files were used as inputs in the Category 2 files below.
+[Category 1:] First 2 files that were modified to run with updated TerraClimate data. The outputs from these files were used as inputs in the Category 2 files below.
 
 **1_climate_niche.R** --> This markdown document explores how historical climate impacts weather sensitivity of tree species. 
 
 **2_plot_level_regression.R** --> This document uses plot-level regressions of RWI sensitivity to annual weather variations. 
 
-###[Category 2:] 3 files of scripts modified from a global to a species-level analysis of tree sensitivity and vulnerability.
+[Category 2:] 3 files of scripts modified from a global to a species-level analysis of tree sensitivity and vulnerability.
 
 **3_run_regressions.R** --> This script species-level regressions to analyze the impact of historical climate on weather sensitivity (combines CMIP5 data with TerraClimate data)
 
