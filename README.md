@@ -1,9 +1,19 @@
 # Mapping Repository 🌲
 Repository for data wrangling and spatial analysis
 
+## Data and Term Definitions
+
 Data:
 
+Raw data file "essential_cwd.csv" can be accessed from the International Tree Ring Data Bank (ITRDB): https://www.ncei.noaa.gov/products/paleoclimatology/tree-ring
+
+Raw climate data files "TerraClimate19611990_pet.nc" and "TerraClimate19611990_def.nc" can be accessed from the TerraClimate website: https://www.climatologylab.org/terraclimate.html
+
 Definitions of key terms:
+
+**CWD(climatic water deficit):** A measure of how much less water availability there will be in the future
+
+**PET(potential evapotranspiration):** The maximum amount of growth a tree will have, when water is unlimited
 
 **sensitivity:** The partial effect of CWD on tree growth (the direction and degree to which trees will react to changes in water availability)
 
@@ -23,7 +33,7 @@ Definitions of key terms:
 
 **5_mapping.R** --> This script creates sensitivity and vulnerability maps for targeted species. 
 
-Repository Structure:
+## Repository Structure:
 ```
 climatree-mapping-repo
 ├── main.R
