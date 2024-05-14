@@ -5,7 +5,7 @@ Repository for data wrangling and spatial analysis
 
 Contributors: Dr. Joan Dudney, Dr. Robert Heilmeyer, Dr. Frances C. Moore
 
-## Data Access and Term Definitions
+## Data Access and Term Definitions 🌳
 
 <u>Data:<u>
 
@@ -27,7 +27,7 @@ Definitions of key terms:
 
 **Coupled Model Intercomparison Project Phase 5 (CMIP5):** An ensemble of climate prediction models used to predict CWD change between historic (1970-2000) and end-of-century (2090-2100)  
 
-## This repository has 7 Rmarkdown files (scripts 1-5 were modified from ongoing research by Dr. Joan Dudney):
+## This repository has 7 Rmarkdown files (scripts 1-5 were modified from ongoing research by Dr. Joan Dudney): 🍃
 
 * scripts 1 and 2 were modified to use new TerraClimate data and outputs were used in scripts 3, 4 and 5
 
@@ -47,7 +47,7 @@ Definitions of key terms:
 
 **create_top_species.R** --> provides code for how we selected the most sampled species (by number of trees in the ITRDB)
 
-## Repository Structure:
+## Repository Structure: 🍂
 ```
 climatree-mapping-repo
 ├── main.R
