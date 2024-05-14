@@ -56,8 +56,6 @@ climatree-mapping-repo
 ├── 3_run_regressions.R
 ├── 4_sens_predictions.R
 ├── 5_mapping.R
-└── prep_scripts
-    ├── 2_spp_list.R
-    └── create_top_species.R
+└── create_top_species.R
 
 ```
