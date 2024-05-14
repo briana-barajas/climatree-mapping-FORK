@@ -51,7 +51,8 @@ rm(list = ls())
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Define path
 data_dir <- "~/../../capstone/climatree/raw_data/"
-output_dir <- "~/../../capstone/climatree/output/1-process-raw-data/"
+#output_dir <- "~/../../capstone/climatree/output/1-process-raw-data/"
+data_dir2 <- "~/../../capstone/climatree/input/external/"
 
 # 1. Historic climate raster
 clim_file <- paste0(data_dir, 'HistoricCWD_AETGrids_Annual.Rdat')
@@ -77,7 +78,7 @@ site_clim_df <- site_clim_df %>%
         # precip = ppt) 
 
 # 4. Load species information for sites
-site_smry <- read_csv(paste0(data_dir, 'site_summary.csv'))
+site_smry <- read_csv(paste0(data_dir2, 'site_summary.csv'))
 site_smry <- site_smry %>%
   select(collection_id, sp_id) %>% 
   mutate(location_id = collection_id) %>% 
@@ -96,18 +97,18 @@ site_smry <- site_smry %>%
 
 
 # 5. Species range maps
-range_file <- paste0(data_dir, 'merged_ranges_dissolve.shp')
+range_file <- paste0(data_dir2, 'merged_ranges_dissolve.shp')
 range_sf <- st_read(range_file)
 
 # 6. Climate projections from CMIP5
-cmip_end <- load(paste0(data_dir, 'cmip5_cwdaet_end.Rdat'))
+cmip_end <- load(paste0(data_dir2, 'cmip5_cwdaet_end.Rdat'))
 pet_cmip_end <- aet_raster + cwd_raster
 cwd_cmip_end <- cwd_raster
 names(cwd_cmip_end) <- NULL # Resetting this due to strange names in file from CMIP processing
 rm(cwd_raster)
 rm(aet_raster)
 
-cmip_start <- load(paste0(data_dir, 'cmip5_cwdaet_start.Rdat'))
+cmip_start <- load(paste0(data_dir2, 'cmip5_cwdaet_start.Rdat'))
 pet_cmip_start <- aet_raster + cwd_raster
 cwd_cmip_start <- cwd_raster
 names(cwd_cmip_start) <- NULL # Resetting this due to strange names in file from CMIP processing
@@ -191,7 +192,7 @@ niche_df <- clim_df %>%
 
 
 ## Export species niche description
-write.csv(niche_df, paste0(output_dir, "clim_niche_old.csv"))
+#write.csv(niche_df, paste0(output_dir, "clim_niche_old.csv"))
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -351,7 +352,7 @@ sp_cmip_clim <- sp_cmip_clim %>%
 
 
 ## Export predictions
-write_rds(sp_cmip_clim, paste0(output_dir, "sp_clim_predictions_old.", compress = "gz"))
+#write_rds(sp_cmip_clim, paste0(output_dir, "sp_clim_predictions_old.", compress = "gz"))
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -435,8 +436,8 @@ spstd_site_clim_df <- spstd_site_clim_df %>%
 spstd_site_clim_df <- spstd_site_clim_df %>% 
   select(-location_id)
 
-write_rds(spstd_site_clim_df, 
-          paste0(output_dir, "site_ave_clim_old.", compress = "gz"))
+#write_rds(spstd_site_clim_df, 
+         # paste0(output_dir, "site_ave_clim_old.", compress = "gz"))
 
 
 
@@ -473,8 +474,8 @@ an_site_clim_df <- an_site_clim_df %>%
 an_site_clim_df <- an_site_clim_df %>%
   select(-location_id)
 
-write_rds(an_site_clim_df, 
-          paste0(output_dir, "site_an_clim_old.", compress = "gz"))
+#write_rds(an_site_clim_df, 
+          #paste0(output_dir, "site_an_clim_old.", compress = "gz"))
 
 
 # ## Exploring source of dropped sites - seems to be entirely driven by sites for species with no range maps

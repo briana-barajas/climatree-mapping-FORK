@@ -52,7 +52,7 @@ future::plan(multisession, workers = n_cores)
 # Load data --------------------------------------------------------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Define path
-data_dir <- "~/../../capstone/climatree/raw_data/"
+data_dir <- "~/../../capstone/climatree/input/external/"
 output_dir <- "~/../../capstone/climatree/output/new-output/"
 
 # 1. Historic climate raster
@@ -249,6 +249,16 @@ pull_clim_tc <- partial(.f = pull_clim, clim_raster = clim_tc)
 clim_df_tc <- species_list %>%
   mutate(clim_vals = map(sp_code,.f = pull_clim_tc))
 
+clim_df_tc_unnest <- clim_df_tc %>% 
+  unnest(cols = clim_vals)
+
+# test correlation
+correlation_df <- clim_df_tc %>%
+  group_by(sp_code) %>%
+  filter(sp_code %in% c("psme", "pcgl", "pisy", "pcab", "tsme", "abal", "quro",
+                        "lasi", "piec", "pifl", "laly", "pist", "pial", "quve",
+                        "pipo", "pire", "pied", "quma", "auch", "pico", "libi")) %>% 
+  summarise(correlation = cor(pet, cwd))
 
  # clim_df <- species_list %>% 
  #   mutate(clim_vals = future_map(sp_code, 
@@ -271,7 +281,7 @@ niche_df <- clim_df_tc %>%
 
 
 ## Export species niche description
-write.csv(niche_df, paste0(output_dir, "clim_niche.csv"))
+#write.csv(niche_df, paste0(output_dir, "clim_niche.csv"))
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -438,7 +448,7 @@ sp_cmip_clim <- sp_cmip_clim %>%
 # 
 
 ## Export predictions
-write_rds(sp_cmip_clim, paste0(output_dir, "sp_clim_predictions.", compress = "gz"))
+#write_rds(sp_cmip_clim, paste0(output_dir, "sp_clim_predictions.", compress = "gz"))
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -523,8 +533,8 @@ spstd_site_clim_df <- spstd_site_clim_df %>%
 spstd_site_clim_df <- spstd_site_clim_df %>% 
   select(-location_id)
 
-write_rds(spstd_site_clim_df, 
-          paste0(output_dir, "site_ave_clim.", compress = "gz"))
+#write_rds(spstd_site_clim_df, 
+          #paste0(output_dir, "site_ave_clim.", compress = "gz"))
 
 
 
@@ -561,8 +571,8 @@ an_site_clim_df <- an_site_clim_df %>%
 an_site_clim_df <- an_site_clim_df %>%
   select(-location_id)
 
-write_rds(an_site_clim_df, 
-          paste0(output_dir, "site_an_clim.", compress = "gz"))
+#write_rds(an_site_clim_df, 
+          #paste0(output_dir, "site_an_clim.", compress = "gz"))
 
 
 # ## Exploring source of dropped sites - seems to be entirely driven by sites for species with no range maps
@@ -807,7 +817,7 @@ fs_df <- fs_df %>%
 fs_df <- fs_df %>% 
   select(-error)
 
-fs_df %>% write_csv(paste0(output_dir, 'site_pet_cwd_std.csv'))
+#fs_df %>% write_csv(paste0(output_dir, 'site_pet_cwd_std.csv'))
 
 
 ## Repeat using results from nb detrended data

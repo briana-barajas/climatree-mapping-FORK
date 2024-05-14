@@ -221,7 +221,8 @@ cwd_sens_map <- ggplot() +
         legend.key.size = unit(8, "pt"),
         legend.title=element_text(size=base_text_size - 2), 
         legend.text=element_text(size=base_text_size - 4))+
-  theme()
+  theme() +
+  ggtitle(species)
 print(cwd_sens_map)
     
 #===============================================================================
@@ -274,7 +275,8 @@ rwi_map <- ggplot() +
         axis.title.y = element_blank(),
         legend.key.size = unit(8, "pt"),
         legend.title=element_text(size=base_text_size - 2), 
-        legend.text=element_text(size=base_text_size - 4))
+        legend.text=element_text(size=base_text_size - 4)) +
+  ggtitle(species)
 print(rwi_map)
     
 }

@@ -28,8 +28,8 @@ library(here)
 ## =======================================================================
 
 # set data and output directories
-data_dir <- here("~","..", "..", "capstone", "climatree", "raw_data")
-output_dir <- here("~","..", "..", "capstone", "climatree", "output", "1-process-raw-data")
+data_dir <- here("~","..", "..", "capstone", "climatree", "input", "external")
+#output_dir <- here("~","..", "..", "capstone", "climatree", "input", "external")
 
 # read in tree ring data
 rwi_long <- read_csv(here(data_dir, "rwi_long.csv"))
@@ -121,7 +121,7 @@ indv_tree_spp <- rwi_species %>%
 sp_count <- plyr::count(indv_tree_spp$sp_code) %>% 
   rename(sp_code = x) %>% 
   inner_join(species_metadata, by = "sp_code") %>% 
-  slice_max(order_by = freq, n = 20) %>% 
+  slice_max(order_by = freq, n = 50) %>% 
   arrange(sp_code)
 
 ## =======================================================================
@@ -131,7 +131,7 @@ sp_count <- plyr::count(indv_tree_spp$sp_code) %>%
 top_n_trees <- site_smry %>% 
   group_by(sp_code) %>% 
   summarise(n_trees = sum(n_trees, na.rm = TRUE)) %>% 
-  slice_max(order_by = n_trees, n = 20) %>% 
+  slice_max(order_by = n_trees, n = 50) %>% 
   arrange(sp_code)
 
 # n_trees in original site summary data is missing, so sp_count using tree will be used

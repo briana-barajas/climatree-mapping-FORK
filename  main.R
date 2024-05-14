@@ -70,8 +70,8 @@ site_df <- site_df %>%
    left_join(site_df, by = "collection_id") %>% 
    filter(species_id %in% c("psme", "pcgl", "pisy", "pcab", "tsme", "abal", "quro",
                             "lasi", "piec", "pifl", "laly", "pist", "pial", "quve",
-                             "pipo", "pire")) # <-------------------------- can choose species to run through script here
-                              #?"fasy"
+                             "pipo", "pire", "pied", "quma", "auch", "pico", "libi")) # <-------------------------- can choose species to run through script here
+                # strange values ---> pcen, pcma, abla, pcsi, pilo, piar, pila, quico, atse, pihe
 
  # define species_id column to iterate through for for loop
 spp_code_list <- unique(flm_df$species_id)
@@ -91,9 +91,9 @@ combined_predictions <- data.frame()
 
 
 # Set the file paths for the three scripts
-script1_path <- "scripts_3_4_5/3_run_regressions.R"
-script2_path <- "scripts_3_4_5/4_sens_predictions.R"
-script3_path <- "scripts_3_4_5/5_mapping.R"
+script1_path <- "3_run_regressions.R"
+script2_path <- "4_sens_predictions.R"
+script3_path <- "5_mapping.R"
 
 # Source the three scripts for the current species
 source(script1_path, local = TRUE)
