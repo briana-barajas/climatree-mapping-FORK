@@ -224,7 +224,8 @@ cwd_sens_map <- ggplot() +
   theme() +
   ggtitle(species)
 print(cwd_sens_map)
-    
+
+}
 #===============================================================================
 # Step 5: Prediction of RWI change  ---------
 #===============================================================================
@@ -257,26 +258,25 @@ print(cwd_sens_map)
     
     
 ### Map of predicted RWI
-rwi_map <- ggplot() +
-  geom_sf(data = world) +
-  geom_raster(data = spp_predictions %>% drop_na(), aes(x = x, y = y, fill = rwi_pred_change_mean)) +
-  # theme_bw(base_size = 12)+
-  ylab("Latitude")+
-  xlab("Longitude")+
-  scale_fill_viridis_c(direction = -1) +
-  #scale_fill_viridis(option="mako")+
-  guides(fill=guide_legend(title="Δ RWI"))+
-  coord_sf(xlim = lon_lims, ylim = lat_lims, expand = FALSE) +
-  scale_x_continuous(breaks=seq(-120,100,10)) +
-  theme(legend.position = c(.18,.15),
-        # axis.text.x=element_text(size=base_text_size - 6),
-        # axis.text.y=element_text(size = base_text_size - 6),
-        axis.title.x=element_blank(),
-        axis.title.y = element_blank(),
-        legend.key.size = unit(8, "pt"),
-        legend.title=element_text(size=base_text_size - 2), 
-        legend.text=element_text(size=base_text_size - 4)) +
-  ggtitle(species)
-print(rwi_map)
+# rwi_map <- ggplot() +
+#   geom_sf(data = world) +
+#   geom_raster(data = spp_predictions %>% drop_na(), aes(x = x, y = y, fill = rwi_pred_change_mean)) +
+#   # theme_bw(base_size = 12)+
+#   ylab("Latitude")+
+#   xlab("Longitude")+
+#   scale_fill_viridis_c(direction = -1) +
+#   #scale_fill_viridis(option="mako")+
+#   guides(fill=guide_legend(title="Δ RWI"))+
+#   coord_sf(xlim = lon_lims, ylim = lat_lims, expand = FALSE) +
+#   scale_x_continuous(breaks=seq(-120,100,10)) +
+#   theme(legend.position = c(.18,.15),
+#         # axis.text.x=element_text(size=base_text_size - 6),
+#         # axis.text.y=element_text(size = base_text_size - 6),
+#         axis.title.x=element_blank(),
+#         axis.title.y = element_blank(),
+#         legend.key.size = unit(8, "pt"),
+#         legend.title=element_text(size=base_text_size - 2), 
+#         legend.text=element_text(size=base_text_size - 4)) +
+#   ggtitle(species)
+# print(rwi_map)
     
-}

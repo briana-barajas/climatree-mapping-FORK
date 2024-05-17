@@ -23,14 +23,14 @@
 # Package imports --------------------------------------------------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # library(MASS)
-# library(tidyverse)
+ library(tidyverse)
 # library(broom)
 # library(purrr)
 # library(margins)
 # library(tidylog)
 # library(fixest)
 # library(gstat)
-# library(sf)
+ library(sf)
 # library(units)
 # library(dtplyr)
 # library(marginaleffects)

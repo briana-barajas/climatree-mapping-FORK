@@ -147,7 +147,8 @@ site_clim_df = site_clim_df %>%
 
 # 6. Species range maps
 range_file <- paste0(data_dir, 'merged_ranges_dissolve.shp')
-range_sf <- st_read(range_file)
+range_sf <- st_read(range_file) %>% 
+  filter(sp_code == "pila")
 
 # 7. Climate projections from CMIP5
 cmip_end <- load(paste0(data_dir, 'cmip5_cwdaet_end.Rdat'))

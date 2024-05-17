@@ -1222,7 +1222,7 @@ output_dir <- "~/../../capstone/climatree/output/intermediate-output/"
 
 
 # 1. Site-level regressions
-flm_df <- read_csv(paste0(output_dir, "site_pet_cwd_std_augmented_pipo.csv")) 
+flm_df <- read_csv(paste0(output_dir, "site_pet_cwd_std_augmented_pcgl.csv")) 
 
 # 2. Species range maps
 range_file <- paste0(data_dir, 'merged_ranges_dissolve.shp')
@@ -1247,7 +1247,7 @@ site_smry <- site_smry %>%
 #   left_join(sp_info, by = c("species_id"))
 
 # 5. Prediction rasters
-sp_predictions <- read_rds(paste0(output_dir, "sp_rwi_pipo.gz"))
+sp_predictions <- read_rds(paste0(output_dir, "sp_rwi_pcgl.gz"))
 # rwi_list <- list.files(paste0(output_dir, "sp_rwi_pipo.gz"), pattern = ".gz", full.names = TRUE)
 # sp_predictions <- do.call('rbind', lapply(rwi_list, readRDS))
 
@@ -1366,80 +1366,82 @@ high_color <- "#404788"
     # write_rds(spp_predictions, paste0(output_dir, "spp_predictions_pila.rds"))
     # 
     ### Map of CWD sensitivity
-    # cwd_sens_map <- ggplot() +
-    #   geom_sf(data = world) +
-    #   geom_raster(data = spp_predictions %>% drop_na(), aes(x = x, y = y, fill = cwd_sens)) +
-    #   #theme_bw(base_size = 22)+
-    #   theme(legend.position = c(.5,.15))+
-    #   ylab("Latitude")+
-    #   xlab("Longitude")+
-    #   guides(fill=guide_legend("Sens."))+
-    #   #scale_fill_viridis_c(direction = -1) +
-    #   scale_fill_viridis(option="mako", direction = -1)+
-    #   coord_sf(xlim = lon_lims, ylim = lat_lims, expand = FALSE) +
-    #   scale_x_continuous(breaks=seq(-120,100,10)) +
-    #   theme(axis.title.x=element_blank(),
-    #         axis.title.y = element_blank(),
-    #         # axis.text.x=element_text(size=base_text_size - 6),
-    #         # axis.text.y=element_text(size = base_text_size - 6),
-    #         legend.key.size = unit(8, "pt"),
-    #         legend.title=element_text(size=base_text_size - 2), 
-    #         legend.text=element_text(size=base_text_size - 4))+
-    #   theme()
-    # cwd_sens_map
+     cwd_sens_map <- ggplot() +
+       geom_sf(data = world) +
+       geom_raster(data = spp_predictions %>% drop_na(), aes(x = x, y = y, fill = cwd_sens)) +
+       #theme_bw(base_size = 22)+
+       theme(legend.position = c(.5,.15))+
+       ylab("Latitude")+
+       xlab("Longitude")+
+       guides(fill=guide_legend("Sens."))+
+       #scale_fill_viridis_c(direction = -1) +
+       scale_fill_viridis(option="mako", direction = -1)+
+       coord_sf(xlim = lon_lims, ylim = lat_lims, expand = FALSE) +
+       scale_x_continuous(breaks=seq(-120,100,10)) +
+       theme(axis.title.x=element_blank(),
+             axis.title.y = element_blank(),
+             # axis.text.x=element_text(size=base_text_size - 6),
+             # axis.text.y=element_text(size = base_text_size - 6),
+             legend.key.size = unit(8, "pt"),
+             legend.title=element_text(size=base_text_size - 2), 
+             legend.text=element_text(size=base_text_size - 4))+
+       theme() +
+       ggtitle(species)
+     cwd_sens_map
     
     #===============================================================================
     # Step 5: Prediction of RWI change  ---------
     #===============================================================================
     ### Map of CWD change
-    spp_predictions <- spp_predictions %>% 
-    mutate(cwd_change = cwd_cmip_end_mean - cwd_cmip_start_mean,
-    pet_change = pet_cmip_end_mean - pet_cmip_start_mean)
+    # spp_predictions <- spp_predictions %>% 
+    # mutate(cwd_change = cwd_cmip_end_mean - cwd_cmip_start_mean,
+    # pet_change = pet_cmip_end_mean - pet_cmip_start_mean)
     
     
-    cwd_change_map <- ggplot() +
-    geom_sf(data = world) +
-    geom_raster(data = spp_predictions %>% drop_na(), aes(x = x, y = y, fill = cwd_change)) +
-    theme_bw(base_size = 22)+
-    guides(fill=guide_legend("Δ CWD"))+
-    theme(legend.position = c(.18,.15))+
-    ylab("Latitude")+
-    xlab("Longitude")+
-    scale_fill_viridis_c(direction = -1) +
-    scale_fill_viridis(option="magma")+
-    coord_sf(xlim = lon_lims, ylim = lat_lims, expand = FALSE) +
-    scale_x_continuous(breaks=seq(-120,100,10)) +
-    theme(axis.title.x=element_blank(),
-    axis.title.y = element_blank(),
-    axis.text.x=element_text(size=base_text_size - 6),
-    axis.text.y=element_text(size = base_text_size - 6),
-    legend.key.size = unit(8, "pt"),
-    legend.title=element_text(size=base_text_size - 2), 
-    legend.text=element_text(size=base_text_size - 4))
-    cwd_change_map
-    
-    
+    # cwd_change_map <- ggplot() +
+    # geom_sf(data = world) +
+    # geom_raster(data = spp_predictions %>% drop_na(), aes(x = x, y = y, fill = cwd_change)) +
+    # theme_bw(base_size = 22)+
+    # guides(fill=guide_legend("Δ CWD"))+
+    # theme(legend.position = c(.18,.15))+
+    # ylab("Latitude")+
+    # xlab("Longitude")+
+    # scale_fill_viridis_c(direction = -1) +
+    # scale_fill_viridis(option="magma")+
+    # coord_sf(xlim = lon_lims, ylim = lat_lims, expand = FALSE) +
+    # scale_x_continuous(breaks=seq(-120,100,10)) +
+    # theme(axis.title.x=element_blank(),
+    # axis.title.y = element_blank(),
+    # axis.text.x=element_text(size=base_text_size - 6),
+    # axis.text.y=element_text(size = base_text_size - 6),
+    # legend.key.size = unit(8, "pt"),
+    # legend.title=element_text(size=base_text_size - 2), 
+    # legend.text=element_text(size=base_text_size - 4))
+    # cwd_change_map
+    # 
+    # 
     ### Map of predicted RWI
-    # rwi_map <- ggplot() +
-    #   geom_sf(data = world) +
-    #   geom_raster(data = spp_predictions %>% drop_na(), aes(x = x, y = y, fill = rwi_pred_change_mean)) +
-    #   # theme_bw(base_size = 12)+
-    #   ylab("Latitude")+
-    #   xlab("Longitude")+
-    #   scale_fill_viridis_c(direction = -1) +
-    #   #scale_fill_viridis(option="mako")+
-    #   guides(fill=guide_legend(title="Δ RWI"))+
-    #   coord_sf(xlim = lon_lims, ylim = lat_lims, expand = FALSE) +
-    #   scale_x_continuous(breaks=seq(-120,100,10)) +
-    #   theme(legend.position = c(.5,.15),
-    #         # axis.text.x=element_text(size=base_text_size - 6),
-    #         # axis.text.y=element_text(size = base_text_size - 6),
-    #         axis.title.x=element_blank(),
-    #         axis.title.y = element_blank(),
-    #         legend.key.size = unit(8, "pt"),
-    #         legend.title=element_text(size=base_text_size - 2), 
-    #         legend.text=element_text(size=base_text_size - 4))
-    # rwi_map
+     rwi_map <- ggplot() +
+       geom_sf(data = world) +
+       geom_raster(data = spp_predictions %>% drop_na(), aes(x = x, y = y, fill = rwi_pred_change_mean)) +
+       # theme_bw(base_size = 12)+
+       ylab("Latitude")+
+       xlab("Longitude")+
+       scale_fill_viridis_c(direction = -1) +
+       #scale_fill_viridis(option="mako")+
+       guides(fill=guide_legend(title="Δ RWI"))+
+       coord_sf(xlim = lon_lims, ylim = lat_lims, expand = FALSE) +
+       scale_x_continuous(breaks=seq(-120,100,10)) +
+       theme(legend.position = c(.5,.15),
+             # axis.text.x=element_text(size=base_text_size - 6),
+             # axis.text.y=element_text(size = base_text_size - 6),
+             axis.title.x=element_blank(),
+             axis.title.y = element_blank(),
+             legend.key.size = unit(8, "pt"),
+             legend.title=element_text(size=base_text_size - 2), 
+             legend.text=element_text(size=base_text_size - 4)) +
+       ggtitle(species)
+     rwi_map
     
     
     
