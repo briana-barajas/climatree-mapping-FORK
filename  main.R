@@ -37,6 +37,7 @@ output_dir <- "~/../../capstone/climatree/output/intermediate-output/"
 ###########################################
 ###########################################
 
+
 # START Script 1 Pre-Processing steps
 
 ###########################################
@@ -69,31 +70,11 @@ site_df <- site_df %>%
  flm_df <- flm_df %>% 
    left_join(site_df, by = "collection_id") %>% 
    filter(species_id %in% c("psme", "pcgl", "pisy", "pcab", "tsme", "abal", "quro",
-                            "lasi", "piec", "pifl", "laly", "pist", "pial", "quve",
-                             "pipo", "pire", "pied", "quma", "auch", "pico", "libi",
-                            "pcen","pcma", "abla", "pcsi", "pilo", "piar", "pila", "quico")) # <-------------------------- can choose species to run through script here
-                        
+                            "lasi", "piec", "pifl", "laly", "pist", "quve",
+                            "pipo", "pire", "pied", "quma", "auch", "pico", "pial",
+                            "pcen","pcma", "pilo", "pila", "quico", "fasy", "psma")) # <-------------------------- can choose species to run through script here
+                            
                        
-
-# add in step to filter based max/min rwi/sens values
-     
- # # Create an empty dataframe to store species code and correlation values
-  correlation_df_bad <- data.frame(species_code = character(), correlation = numeric(), stringsAsFactors = FALSE)
-  
-  # Iterate through the unique species codes and calculate the correlation
-  for (species in unique(flm_df$species_id)) {
-    species_data <- flm_df %>% filter(species_id == species)
-    
-    pet_values <- species_data$pet.spstd
-    cwd_values <- species_data$cwd.spstd
-    correlation <- cor(pet_values, cwd_values)
-    
-    # Create a temporary dataframe with the current species code and correlation value
-    temp_df <- data.frame(species_code = species, correlation = correlation, stringsAsFactors = FALSE)
-    
-    # Append the temporary dataframe to the main correlation_df dataframe
-    correlation_df_bad <- rbind(correlation_df_bad, temp_df)
-  }
   
 # define species_id column to iterate through for for loop
 spp_code_list <- unique(flm_df$species_id)

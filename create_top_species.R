@@ -146,11 +146,11 @@ sp_count$sp_code
 # plot top 20 collection ID counts
 sp_count %>% 
   ggplot() +
-  geom_col(aes(x = fct_reorder(spp, freq), y = freq), fill = "palegreen4") +
+  geom_col(aes(x = fct_reorder(sp_code, freq), y = freq), fill = "palegreen4") +
   labs(x = "Genus Species",
        y = "Number of Trees Sampled",
        title = "20 Most Prominent Species in Tree Core Dataset") +
-  geom_text(aes(x = fct_reorder(spp, freq), y = freq,
+  geom_text(aes(x = fct_reorder(sp_code, freq), y = freq,
                 label = freq), hjust = 1.2, color = "white", size = 3.5) +
   coord_flip() +
   theme_minimal()
