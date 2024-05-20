@@ -1,0 +1,109 @@
+---
+title: "Slide Maps"
+subtitle: "Creating Sample Maps for Presentation"
+author: "Briana Barajas"
+---
+
+```{r}
+library(tidyverse)
+library(here)
+
+library(ggplot2)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(sf)
+library(terra)
+```
+
+
+```{r}
+# read in all species data
+comb_df <- read_csv(here("~/../../capstone/climatree/output/final-output/combined_predictions.csv"))
+
+# read in range map
+range_sf <- st_read(here("~/../../capstone/climatree/input/external/merged_ranges_dissolve.shp"))
+
+# select a species for filtering
+spp_code <- "pico"
+
+```
+
+
+```{r, eval=FALSE}
+# create bounding box for species range
+sp_range <- range_sf %>% 
+  filter(sp_code == spp_code)
+sp_bbox <- st_bbox(sp_range)
+lon_lims <- c(sp_bbox$xmin - 1, sp_bbox$xmax + 1)
+lat_lims <- c(sp_bbox$ymin - 1, sp_bbox$ymax + 1)
+
+# store world map
+world <- ne_coastline(scale = "medium", returnclass = "sf")
+
+# filter to a single species
+single_spp <- comb_df %>% 
+  filter(species_code == spp_code) %>%
+  mutate(cwd_sens = round(cwd_sens, 2)) %>% 
+  mutate(mean_cwd_sens = mean(cwd_sens),
+         sens_level = case_when(cwd_sens >= mean_cwd_sens ~ "Highly Sensitive",
+                                cwd_sens < mean_cwd_sens & cwd_sens > 0  ~ "Moderately Sensitive",
+                                cwd_sens == 0 ~ "Not Sensitive",
+                                TRUE ~ "Least Concern")) %>%
+  select(-mean_cwd_sens) %>% 
+  mutate(sens_level = factor(sens_level,
+                             levels = c("Highly Sensitive", "Moderately Sensitive", "Not Sensitive", "Least Concern"),
+                             ordered = TRUE))
+```
+
+```{r}
+# create bounding box for species range
+sp_range <- range_sf %>% 
+  filter(sp_code == spp_code)
+sp_bbox <- st_bbox(sp_range)
+lon_lims <- c(sp_bbox$xmin - 1, sp_bbox$xmax + 1)
+lat_lims <- c(sp_bbox$ymin - 1, sp_bbox$ymax + 1)
+
+# store world map
+world <- ne_coastline(scale = "medium", returnclass = "sf")
+
+# filter to a single species
+single_spp <- comb_df %>% 
+  filter(species_code == spp_code) %>%
+  
+  # define 4 bins for sensitivity levels
+  mutate(sens_level = ntile(cwd_sens, n=4)) %>%
+  mutate(sens_level = case_when(sens_level == 1 ~ "Highly Sensitive",
+                                sens_level == 2 ~ "Moderately Sensitive",
+                                sens_level == 3 ~ "Not Sensitive",
+                                sens_level == 4 ~ "Least Concern")) %>% 
+  mutate(sens_level = factor(sens_level,
+                             levels = c("Highly Sensitive", "Moderately Sensitive", 
+                                        "Not Sensitive", "Least Concern"),
+                             ordered = TRUE))
+```
+
+
+
+```{r}
+# map plain species range
+ggplot() +
+  geom_sf(data = world) +
+  geom_sf(data = sp_range, fill = "palegreen4") +
+  coord_sf(xlim = lon_lims, ylim = lat_lims, expand = FALSE) +
+  theme_void()
+
+# map raster
+ggplot() +
+  geom_sf(data = world) +
+  geom_raster(data = single_spp,
+              aes(x=x, y=y, fill = sens_level)) +
+  labs(x = NULL, y = NULL, fill = "Sensitivity Level") +
+  coord_sf(xlim = lon_lims, ylim = lat_lims, expand = FALSE) +
+  scale_fill_manual(values = c("Highly Sensitive" = "#E56C3A",
+                               "Moderately Sensitive" = "#F9E0D2",
+                               "Not Sensitive" = "#72BFE6",
+                               "Least Concern" = "#144D6F")) +
+  theme_void() +
+  theme(legend.position = c(.18,.3))
+```
+
