@@ -4,10 +4,11 @@ subtitle: "Creating Sample Maps for Presentation"
 author: "Briana Barajas"
 ---
 
-```{r}
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 library(tidyverse)
 library(here)
-
 library(ggplot2)
 library(rnaturalearth)
 library(rnaturalearthdata)
@@ -16,7 +17,7 @@ library(terra)
 ```
 
 
-```{r}
+```{r, results='hide'}
 # read in all species data
 comb_df <- read_csv(here("~/../../capstone/climatree/output/final-output/combined_predictions.csv"))
 
@@ -26,33 +27,6 @@ range_sf <- st_read(here("~/../../capstone/climatree/input/external/merged_range
 # select a species for filtering
 spp_code <- "pico"
 
-```
-
-
-```{r, eval=FALSE}
-# create bounding box for species range
-sp_range <- range_sf %>% 
-  filter(sp_code == spp_code)
-sp_bbox <- st_bbox(sp_range)
-lon_lims <- c(sp_bbox$xmin - 1, sp_bbox$xmax + 1)
-lat_lims <- c(sp_bbox$ymin - 1, sp_bbox$ymax + 1)
-
-# store world map
-world <- ne_coastline(scale = "medium", returnclass = "sf")
-
-# filter to a single species
-single_spp <- comb_df %>% 
-  filter(species_code == spp_code) %>%
-  mutate(cwd_sens = round(cwd_sens, 2)) %>% 
-  mutate(mean_cwd_sens = mean(cwd_sens),
-         sens_level = case_when(cwd_sens >= mean_cwd_sens ~ "Highly Sensitive",
-                                cwd_sens < mean_cwd_sens & cwd_sens > 0  ~ "Moderately Sensitive",
-                                cwd_sens == 0 ~ "Not Sensitive",
-                                TRUE ~ "Least Concern")) %>%
-  select(-mean_cwd_sens) %>% 
-  mutate(sens_level = factor(sens_level,
-                             levels = c("Highly Sensitive", "Moderately Sensitive", "Not Sensitive", "Least Concern"),
-                             ordered = TRUE))
 ```
 
 ```{r}
@@ -71,16 +45,24 @@ single_spp <- comb_df %>%
   filter(species_code == spp_code) %>%
   
   # define 4 bins for sensitivity levels
-  mutate(sens_level = ntile(cwd_sens, n=4)) %>%
-  mutate(sens_level = case_when(sens_level == 1 ~ "Highly Sensitive",
-                                sens_level == 2 ~ "Moderately Sensitive",
-                                sens_level == 3 ~ "Not Sensitive",
-                                sens_level == 4 ~ "Least Concern")) %>% 
+  mutate(sens_level_numeric = ntile(cwd_sens, n=4)) %>%
+  mutate(sens_level = case_when(sens_level_numeric == 1 ~ "Highly Sensitive",
+                                sens_level_numeric == 2 ~ "Moderately Sensitive",
+                                sens_level_numeric == 3 ~ "Not Sensitive",
+                                sens_level_numeric == 4 ~ "Least Concern")) %>% 
   mutate(sens_level = factor(sens_level,
                              levels = c("Highly Sensitive", "Moderately Sensitive", 
                                         "Not Sensitive", "Least Concern"),
                              ordered = TRUE))
+
+# check df to see if sensitivity levels match as expected (least concern = positive)
+single_spp %>% 
+  sample_frac(0.02) %>% 
+  arrange(sens_level_numeric) %>% 
+  gt::gt()
+
 ```
+
 
 
 
