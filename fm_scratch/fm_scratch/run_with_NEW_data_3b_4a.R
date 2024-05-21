@@ -148,7 +148,7 @@ site_clim_df = site_clim_df %>%
 # 6. Species range maps
 range_file <- paste0(data_dir, 'merged_ranges_dissolve.shp')
 range_sf <- st_read(range_file) %>% 
-  filter(sp_code == "pila")
+  filter(sp_code == "pipo")
 
 # 7. Climate projections from CMIP5
 cmip_end <- load(paste0(data_dir, 'cmip5_cwdaet_end.Rdat'))
@@ -175,7 +175,27 @@ rm(aet_raster)
 
 clim_tc <- resample(clim_tc, cwd_cmip_start, method = "bilinear")
 
+library(tigris)
 
+# Get Washington state boundary from the tigris package
+california_sf <- states(cb = TRUE) %>%
+  filter(NAME == "California")
+
+# Set the CRS of washington_sf to match the CRS of range_sf
+california_sf <- st_transform(california_sf, st_crs(range_sf))
+
+# Clip the range_sf object to the Washington state boundary
+range_ca_sf <- st_intersection(range_sf, california_sf)
+
+# Create an interactive tmap plot focused on Washington state
+ggplot() +
+  geom_sf(data = california_sf, fill = "white", color = "black", linewidth = 0.5) +
+  geom_sf(data = range_ca_sf, fill = "#EAE4D2", alpha = 0.7, color = "black", linewidth = 0.5) +
+  theme_minimal() +
+  labs(title = NULL) +
+  theme(plot.title = element_text(hjust = 0.5, size = 16),
+        plot.subtitle = element_text(hjust = 0.5, size = 12)) +
+  theme_void()
 # #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # # Visually inspect data -----------------------------------------------
 # #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -249,17 +269,6 @@ pull_clim_tc <- partial(.f = pull_clim, clim_raster = clim_tc)
 
 clim_df_tc <- species_list %>%
   mutate(clim_vals = map(sp_code,.f = pull_clim_tc))
-
-clim_df_tc_unnest <- clim_df_tc %>% 
-  unnest(cols = clim_vals)
-
-# test correlation
-correlation_df <- clim_df_tc %>%
-  group_by(sp_code) %>%
-  filter(sp_code %in% c("psme", "pcgl", "pisy", "pcab", "tsme", "abal", "quro",
-                        "lasi", "piec", "pifl", "laly", "pist", "pial", "quve",
-                        "pipo", "pire", "pied", "quma", "auch", "pico", "libi")) %>% 
-  summarise(correlation = cor(pet, cwd))
 
  # clim_df <- species_list %>% 
  #   mutate(clim_vals = future_map(sp_code, 
@@ -422,30 +431,31 @@ sp_cmip_clim <- sp_cmip_clim %>%
 
 
 # ## Check final result as raster
-#  species = "pcgl"
-#  test_clim <- (sp_cmip_clim %>% filter(sp_code == species) %>% pull(clim_cmip_sp))[[1]]
-#  crs_template <- crs(cwd_cmip_end)
-#  raster_template <- cwd_cmip_end %>% as.data.frame(xy = TRUE) %>% select(x,y)
-#  test_clim <- raster_template %>%
-#    left_join(test_clim, by = c("x", "y"))
-#  test_clim <- rasterFromXYZ(test_clim, crs = crs_template)
-#  range <- range_sf %>% filter(sp_code == species)
-#  tmap_mode("view")
+  species = "pcgl"
+  test_clim <- (sp_cmip_clim %>% filter(sp_code == species) %>% pull(clim_cmip_sp))[[1]]
+  crs_template <- crs(cwd_cmip_end)
+  raster_template <- cwd_cmip_end %>% as.data.frame(xy = TRUE) %>% select(x,y)
+  test_clim <- raster_template %>%
+    left_join(test_clim, by = c("x", "y"))
+  test_clim <- rasterFromXYZ(test_clim, crs = crs_template)
+  range <- range_sf %>% filter(sp_code == species)
+  tmap_mode("view")
+ 
 # # 
-#  tm_shape(test_clim$cwd_cmip_end1) +
-#    tm_raster(palette = "-RdYlGn") +
-#    tm_facets(as.layers = TRUE) +
-#    tm_shape(range) + 
-#    tm_fill(col = "lightblue")
+  tm_shape(test_clim$cwd_cmip_end1) +
+    tm_raster(palette = "-RdYlGn") +
+    tm_facets(as.layers = TRUE) +
+    tm_shape(range) + 
+    tm_fill(col = "lightblue")
 # # 
-#  tm_shape(test_clim$cwd_cmip_end1) +
-#    tm_raster(palette = "-RdYlGn") +
-#    tm_facets(as.layers = TRUE) +
-#    tm_shape(test_clim$cwd_cmip_start1) +
-#    tm_raster(palette = "-RdYlGn") +
-#    tm_facets(as.layers = TRUE) +
-#    tm_shape(range) + 
-#    tm_fill(col = "lightblue")
+  tm_shape(test_clim$cwd_cmip_end1) +
+    tm_raster(palette = "-RdYlGn") +
+    tm_facets(as.layers = TRUE) +
+    tm_shape(test_clim$cwd_cmip_start1) +
+    tm_raster(palette = "-RdYlGn") +
+    tm_facets(as.layers = TRUE) +
+    tm_shape(range) + 
+    tm_fill(col = "lightblue")
 # 
 
 ## Export predictions
