@@ -25,7 +25,7 @@ comb_df <- read_csv(here("~/../../capstone/climatree/output/final-output/combine
 range_sf <- st_read(here("~/../../capstone/climatree/input/external/merged_ranges_dissolve.shp"))
 
 # select a species for filtering
-spp_code <- "pico"
+spp_code <- "quro"
 
 # create bounding box for species range
 sp_range <- range_sf %>% 
@@ -42,40 +42,40 @@ world <- ne_coastline(scale = "medium", returnclass = "sf")
 ```{r}
 ## ..............................even bins.............................
 
-# filter to a single species
-single_spp <- comb_df %>% 
-  filter(species_code == spp_code) %>%
-  
-  # define 4 bins for sensitivity levels
-  mutate(sens_level_numeric = ntile(cwd_sens, n=4)) %>%
-  mutate(sens_level = case_when(sens_level_numeric == 1 ~ "High Sensitivity",
-                                sens_level_numeric == 2 ~ "Moderate Sensitivity",
-                                sens_level_numeric == 3 ~  "Low Sensitivity",
-                                sens_level_numeric == 4 ~ "Least Concern")) %>% 
-  mutate(sens_level = factor(sens_level,
-                             levels = c("High Sensitivity", "Moderate Sensitivity", 
-                                         "Low Sensitivity", "Least Concern"),
-                             ordered = TRUE))
-
-# check df to see if sensitivity levels match as expected (least concern = positive)
-# single_spp %>% 
-#   sample_frac(0.02) %>% 
-#   arrange(sens_level_numeric) %>% 
-#   gt::gt()
+# # filter to a single species
+# single_spp <- comb_df %>% 
+#   filter(species_code == spp_code) %>%
+#   
+#   # define 4 bins for sensitivity levels
+#   mutate(sens_level_numeric = ntile(cwd_sens, n=4)) %>%
+#   mutate(sens_level = case_when(sens_level_numeric == 1 ~ "High Sensitivity",
+#                                 sens_level_numeric == 2 ~ "Moderate Sensitivity",
+#                                 sens_level_numeric == 3 ~  "Low Sensitivity",
+#                                 sens_level_numeric == 4 ~ "Least Concern")) %>% 
+#   mutate(sens_level = factor(sens_level,
+#                              levels = c("High Sensitivity", "Moderate Sensitivity", 
+#                                          "Low Sensitivity", "Least Concern"),
+#                              ordered = TRUE))
 
 
 ## ..............................divide positive bins.............................
-# single_spp <- comb_df %>% 
-#   filter(species_code == spp_code) %>% 
-#   mutate(value = ifelse(cwd_sens >= 0, "positive", "negative")) %>% 
-#   mutate(sens_level = ifelse(value == "negative",
-#                              ntile(n=3), 4)) %>% 
-#   mutate(sens_level = case_when(sens_level == 1 ~ "High Sensitivity",
-#                                 sens_level == 2 ~ "Moderate Sensitivity",
-#                                 sens_level == 3 ~  "Low Sensitivity",
-#                                 sens_level == 4 ~ "Least Concern")) %>% 
-#   dplyr::select(-value)
-#   
+
+single_spp <- comb_df %>% filter(species_code == spp_code)
+
+quant <- quantile(single_spp$cwd_sens[single_spp$cwd_sens < 0], probs = c(0.25, 0.75))
+
+single_spp <- single_spp %>%
+  mutate(sens_level = case_when(
+    cwd_sens >= 0 ~ "Least Concern",
+    cwd_sens <= quant[1] ~ "High Sensitivity",
+    cwd_sens > quant[1] & cwd_sens <= quant[2] ~ "Moderate Sensitivity",
+    cwd_sens > quant[2] & cwd_sens < 0 ~ "Low Sensitivity")) %>% 
+  mutate(sens_level = factor(sens_level,
+                             levels = c("High Sensitivity", "Moderate Sensitivity", 
+                                        "Low Sensitivity", "Least Concern"),
+                             ordered = TRUE))
+  
+
 
 ```
 
@@ -101,4 +101,5 @@ ggplot() +
   theme_void() +
   theme(legend.position = c(.18,.3))
 ```
+
 
