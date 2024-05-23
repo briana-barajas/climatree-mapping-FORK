@@ -29,6 +29,8 @@ Definitions of key terms:
 
 ## This repository has 7 Rmarkdown files (scripts 1-5 were modified from ongoing research by Dr. Joan Dudney, Dr. Robert Heilmeyer and Dr. Frances C. Moore): 🍃
 
+* Scripts must be run in numerical order, as the outputs from the previous scripts are used in later scripts as inputs
+
 * scripts 1 and 2 were modified to use new TerraClimate data and outputs were used in scripts 3, 4 and 5
 
 **1_climate_niche.R** --> This markdown document explores how historical climate impacts weather sensitivity of tree species. 
