@@ -1,4 +1,30 @@
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Authors: Briana Barajas, Fletcher McConnell, Rosemary Juarez, Vanessa Salgado
+# Project: Mapping Tree Species' Drought Sensitivity Under Climate Change
+# Institution: Bren School of Environmental Science & Management - UCSB
+# Date: 2024-06-07
+# Purpose: Extract and standardize climate data across species ranges
+#
+# Input files:
+# - TerraClimate19611990_def.nc: rasters of historic cwd
+# - TerraClimate19611990_pet.nc: rasters of historic pet
+# - site_summary.csv: site attributes
+# - itrdbsites_pet.csv: monthly site pet
+# - itrdbsites_def.csv monthly site cwd
+# - merged_ranges_dissolve.shp: shapefiles tree species' ranges
+# - cmip5_cwdaet_end.Rdat: cwd predictions using CMIP5
+# - cmip5_cwdaet_start.Rdat: cwd predictions using CMIP5
+#
+# Output files:
+# - clim_niche.csv
+# - sp_clim_predictions.gz
+# - site_ave_clim.gz
+# - site_an_clim.gz
+#
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Package imports --------------------------------------------------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 library(tidyverse)

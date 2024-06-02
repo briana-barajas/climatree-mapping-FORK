@@ -1,20 +1,20 @@
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# Authors: Robert Heilmayr, Joan Dudney, Frances Moore
-# Project: Treeconomics
-# Date: 5/17/20
-# Purpose: Run regressions to explore impact of historical climate on weather sensitivity
+# Authors: Briana Barajas, Fletcher McConnell, Rosemary Juarez, Vanessa Salgado
+# Project: Mapping Tree Species' Drought Sensitivity Under Climate Change
+# Institution: Bren School of Environmental Science & Management - UCSB
+# Date: 2024-06-07
+# Purpose: Estimate species sensitivity fluctuation under historic climate
 #
 # Input files:
-# - site_pet_cwd_std.csv: Table of first stage regression parameters for baseline specification. Generated in "4a. First stage.R"
-# - site_ave_clim.gz: Site-level climate parameters. Generated using "3b. Species_niche.R"
-# - site_summary.csv: Summary data about each site. Generated using "1b. Parse ITRDB.R"
-# - species_gen_gr.csv: Lookup key for angiosperm / gymnosperm differentiation
-# 
-# Output files:
-# - site_pet_cwd_std_augmented.csv: Intermediate file to enable downstream identification of outlier assignment.
-# - mc_sample.gz: Intermediate file of all bootstrapped samples.
-# - ss_bootstrap.rds: Final second stage model parameters for each of n_mc Monte Carlo runs.
+# - site_pet_cwd_std.csv
+# - site_ave_clim.gz
+# - site_summary.csv
+# - species_metadata.csv
 #
+# Output files (species specific):
+# - ss_bootstrap
+# - site_pet_cwd_std_augmented
+# - mc_sample
 #
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
