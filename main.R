@@ -1,3 +1,22 @@
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Authors: Briana Barajas, Fletcher McConnell, Rosemary Juarez, Vanessa Salgado
+# Project: Mapping Tree Species' Drought Sensitivity Under Climate Change
+# Institution: Bren School of Environmental Science & Management - UCSB
+# Date: 2024-06-07
+# Purpose: Run scripts 3-5
+#
+# Input files:
+# - site_pet_cwd_std.csv
+# - site_ave_clim.gz
+# - site_summary.csv
+# - species_metadata.csv
+#
+# Output files:
+# - combined_predictions.csv: final predictions for all species
+#
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 # Load necessary libraries
 library(dplyr)
 library(MASS)

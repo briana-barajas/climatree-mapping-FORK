@@ -1,17 +1,17 @@
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# Authors: Robert Heilmayr, Joan Dudney, Frances Moore
-# Project: Treeconomics
-# Date: 5/27/20
-# Purpose: Create predictions of growth impacts from climate change
+# Authors: Briana Barajas, Fletcher McConnell, Rosemary Juarez, Vanessa Salgado
+# Project: Mapping Tree Species' Drought Sensitivity Under Climate Change
+# Institution: Bren School of Environmental Science & Management - UCSB
+# Date: 2024-06-07
+# Purpose: Predict species growth given estimates for future variations in climatic water deficit through 2100**
 #
 # Input files:
-# - ss_bootstrap.rds: R model object saved from Second stage
-# - sp_clim_predictions.gz:
-# 
-# Output files
-# - sp_rwi/<sp_code>.gz:
+# - ss_bootstrap (species specific)
+# - sp_clim_predictions.gz
+# -
 #
-# ToDo:
+# Output files (species specific):
+# - sp_rwi
 #
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

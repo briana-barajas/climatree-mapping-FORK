@@ -27,7 +27,9 @@ Definitions of key terms:
 
 **Coupled Model Intercomparison Project Phase 5 (CMIP5):** An ensemble of climate prediction models used to predict CWD change between historic (1970-2000) and end-of-century (2090-2100)  
 
-## This repository has 7 Rmarkdown files (scripts 1-5 were modified from ongoing research by Dr. Joan Dudney): 🍃
+## This repository has 7 Rmarkdown files (scripts 1-5 were modified from ongoing research by Dr. Joan Dudney, Dr. Robert Heilmeyer and Dr. Frances C. Moore): 🍃
+
+* Scripts must be run in numerical order, as the outputs from the previous scripts are used in later scripts as inputs
 
 * scripts 1 and 2 were modified to use new TerraClimate data and outputs were used in scripts 3, 4 and 5
 

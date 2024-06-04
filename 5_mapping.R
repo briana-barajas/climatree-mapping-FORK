@@ -1,8 +1,17 @@
-#===============================================================================
-# Species deep dive plots
-# 
-# 
-#===============================================================================
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Authors: Briana Barajas, Fletcher McConnell, Rosemary Juarez, Vanessa Salgado
+# Project: Mapping Tree Species' Drought Sensitivity Under Climate Change
+# Institution: Bren School of Environmental Science & Management - UCSB
+# Date: 2024-06-07
+# Purpose: Map species sensitivity and growth
+#
+# Input files:
+# - site_pet_cwd_std_augmented (species specific)
+# - sp_rwi (species specific)
+# - merged_ranges_dissolve.shp
+# - site_summary.csv
+#
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 #===============================================================================
 # 1) Pkg imports ---------
