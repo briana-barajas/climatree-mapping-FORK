@@ -19,17 +19,15 @@
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Package imports --------------------------------------------------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
- library(tidyr)
- library(tidyverse)
-# # library(tidylog)
-# library(dbplyr)
-# library(broom.mixed)
-# library(broom)
-# library(purrr)
-# library(fixest)
-# library(dtplyr)
-# library(furrr)
+library(tidyverse)
+library(dbplyr)
+library(broom.mixed)
+library(broom)
+library(purrr)
+library(fixest)
+library(dtplyr)
+library(furrr)
+select <- dplyr::select
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -37,7 +35,7 @@
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Define path
 data_dir <- "~/../../capstone/climatree/raw_data/"
-output_dir <- "~/../../capstone/climatree/output/new-output/"
+output_dir <- "~/../../capstone/climatree/output/"
 
 
 # 1. Dendrochronologies
@@ -126,16 +124,11 @@ fs_mod <- function(site_data, outcome = "rwi", energy_var = "pet.an", mod_type =
         
         mod_sum <- summary(mod)
         mod_vcov <- vcov(mod)
-        # cov <- list(int_cwd = mod_vcov[1, 2], 
-        #             int_pet = mod_vcov[1, 3], 
-        #             pet_cwd = mod_vcov[2, 3])
         nobs <- nobs(mod)
         mod <- tidy(mod) %>%
           mutate(term = term %>% str_replace("\\(Intercept\\)", "intercept")) %>% 
           filter(term %in% c('intercept', 'cwd.an', energy_var)) %>% 
           pivot_wider(names_from = "term", values_from = c("estimate", "std.error", "statistic", "p.value"))
-        # mod <- mod %>% 
-        #   rename_all(funs(stringr::str_replace_all(., energy_var, 'energy.an')))
         mod$cov_int_cwd = mod_vcov[c("(Intercept)"), c("cwd.an")]
         cov_var_name <- paste0("cov_int_", energy_var %>% str_replace(".an", ""))
         mod[[cov_var_name]] = mod_vcov[c("(Intercept)"), c(energy_var)]
@@ -161,28 +154,17 @@ fs_mod <- function(site_data, outcome = "rwi", energy_var = "pet.an", mod_type =
 # Run site-level regressions --------------------------------------------------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 site_df <- dendro_df %>% 
-  # drop_na() %>% 
   rename(cwd.an = cwd.an.spstd,
          pet.an = pet.an.spstd) %>% 
-  #temp.an = temp.an.spstd) %>% 
   group_by(collection_id) %>%
   add_tally(name = 'nobs') %>% 
-  # filter(nobs>10) %>% 
   nest()
 
 
 fs_mod_bl <- partial(fs_mod, outcome = "rwi", energy_var = "pet.an", mod_type = "lm")
-# fs_mod_nb <- partial(fs_mod, outcome = "rwi_nb", energy_var = "pet.an", mod_type = "lm")
-# fs_mod_ar <- partial(fs_mod, outcome = "rwi_ar", energy_var = "pet.an", mod_type = "lm")
-# #fs_mod_temp <- partial(fs_mod, outcome = "rwi", energy_var = "temp.an", mod_type = "lm")
-# fs_mod_re <- partial(fs_mod, outcome = "rwi", energy_var = "pet.an", mod_type = "lme")
 
 site_df <- site_df %>% 
   mutate(fs_result = map(data, .f = fs_mod_bl))
-# fs_result_nb = map(data, .f = fs_mod_nb),
-# fs_result_ar = map(data, .f = fs_mod_ar),
-# #fs_result_temp = map(data, .f = fs_mod_temp),
-# fs_result_re = map(data, .f = fs_mod_re))
 
 
 data_df <- site_df %>% 
@@ -201,47 +183,3 @@ fs_df <- fs_df %>%
 
 fs_df %>% write_csv(paste0(output_dir, 'site_pet_cwd_std.csv'))
 
-
-## Repeat using results from nb detrended data
-# fs_nb <- site_df %>% 
-#   select(collection_id, fs_result_nb) %>% 
-#   unnest(fs_result_nb)
-# fs_nb <- fs_nb[which(!(fs_nb %>% pull(mod) %>% is.na())),]
-# fs_nb <- fs_nb %>% 
-#   unnest(mod) %>% 
-#   select(-error)
-# fs_nb %>% write_csv(paste0(output_dir, 'site_pet_cwd_std_nb.csv'))
-# 
-# 
-# ## Repeat using results from ar detrended data
-# fs_ar <- site_df %>% 
-#   select(collection_id, fs_result_ar) %>% 
-#   unnest(fs_result_ar)
-# fs_ar <- fs_ar[which(!(fs_ar %>% pull(mod) %>% is.na())),]
-# fs_ar <- fs_ar %>% 
-#   unnest(mod) %>% 
-#   select(-error)
-# fs_ar %>% write_csv(paste0(output_dir, 'site_pet_cwd_std_ar.csv'))
-# 
-# 
-# # ## Repeat using results from temp model
-# # fs_temp <- site_df %>% 
-# #   select(collection_id, fs_result_temp) %>% 
-# #   unnest(fs_result_temp)
-# # fs_temp <- fs_temp[which(!(fs_temp %>% pull(mod) %>% is.na())),]
-# # fs_temp <- fs_temp %>% 
-# #   unnest(mod) %>% 
-# #   select(-error)
-# # fs_temp %>% write_csv(paste0(output_dir, 'site_temp_cwd_std.csv'))
-# 
-# 
-# ## Repeat using results from re model
-# fs_re <- site_df %>% 
-#   select(collection_id, fs_result_re) %>% 
-#   unnest(fs_result_re)
-# fs_re <- fs_re[which(!(fs_re %>% pull(mod) %>% is.na())),]
-# fs_re <- fs_re %>% 
-#   unnest(mod) %>% 
-#   select(-error)
-# fs_re %>% write_csv(paste0(output_dir, 'site_pet_cwd_std_re.csv'))
-# 

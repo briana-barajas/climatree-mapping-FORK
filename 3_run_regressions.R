@@ -35,7 +35,6 @@
  library(dtplyr)
  library(marginaleffects)
  library(fixest)
- # library(raster)
  library(sp)
  library(sf)
  library(rnaturalearth)
@@ -49,50 +48,45 @@
  library(snow)
  library(profvis)
  library(tmap)
- library(tidylog)
-# set.seed(5597)
-# 
-# select <- dplyr::select
-# 
-# n_mc <- 1000
-# 
+
+
 # #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # # Import data --------------------------------------------------------
 # #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# ### Define path
-#  data_dir <- "~/../../capstone/climatree/raw_data/"
-#  output_dir <- "~/../../capstone/climatree/output/new-output/"
-# 
-#  # 1. Site-level regressions
-#  flm_df <- read_csv(paste0(output_dir, 'site_pet_cwd_std.csv'))
-# 
-#  # 2. Historic site-level climate
-#  ave_site_clim <- read_rds(paste0(output_dir, "site_ave_clim.gz"))
-#  flm_df <- flm_df %>%
-#    left_join(ave_site_clim, by = c("collection_id"))
-# 
-#  # 3. Site information
-#  site_df <- read_csv(paste0(data_dir, 'site_summary.csv'))
-#  site_df <- site_df %>%
-#    select(collection_id, sp_id, latitude, longitude)
-#  site_df <- site_df %>%
-#    rename(species_id = sp_id) %>%
-#    mutate(species_id = str_to_lower(species_id))
-# 
-#  # # 4. Species information
-#  sp_info <- read_csv(paste0(data_dir, 'species_metadata.csv'))
-#  sp_info <- sp_info %>%
-#    select(species_id, genus, gymno_angio, family)
-#  site_df <- site_df %>%
-#    left_join(sp_info, by = "species_id")
-# 
-#  # Merge back into main flm_df
-#  flm_df <- flm_df %>%
-#    left_join(site_df, by = "collection_id") %>%
-#    filter(species_id %in% c("pcgl", "psme", "pisy")) # <-------------------------- can choose species to run through script here
-# 
-# # define species_id column to iterate through for for loop
-# spp_code_list <- unique(flm_df$species_id)
+## Define path
+data_dir <- "~/../../capstone/climatree/raw_data/"
+output_dir <- "~/../../capstone/climatree/output/"
+
+ # 1. Site-level regressions
+ flm_df <- read_csv(paste0(output_dir, 'site_pet_cwd_std.csv'))
+
+ # 2. Historic site-level climate
+ ave_site_clim <- read_rds(paste0(output_dir, "site_ave_clim.gz"))
+ flm_df <- flm_df %>%
+   left_join(ave_site_clim, by = c("collection_id"))
+
+ # 3. Site information
+ site_df <- read_csv(paste0(data_dir, 'site_summary.csv'))
+ site_df <- site_df %>%
+   select(collection_id, sp_id, latitude, longitude)
+ site_df <- site_df %>%
+   rename(species_id = sp_id) %>%
+   mutate(species_id = str_to_lower(species_id))
+
+ # # 4. Species information
+ sp_info <- read_csv(paste0(data_dir, 'species_metadata.csv'))
+ sp_info <- sp_info %>%
+   select(species_id, genus, gymno_angio, family)
+ site_df <- site_df %>%
+   left_join(sp_info, by = "species_id")
+
+ # Merge back into main flm_df
+ flm_df <- flm_df %>%
+   left_join(site_df, by = "collection_id") %>%
+   filter(species_id %in% c("pcgl", "psme", "pisy")) # <-------------------------- can choose species to run through script here
+
+# define species_id column to iterate through for for loop
+spp_code_list <- unique(flm_df$species_id)
 
 # store flm_df data frame for loop
 original_flm_df <- flm_df
@@ -122,15 +116,6 @@ pet_est_bounds = quantile(flm_df$estimate_pet.an, c(0.01, 0.99),na.rm=T)
 cwd_spstd_bounds = quantile(flm_df$cwd.spstd, c(0.01, 0.99), na.rm = T)
 pet_spstd_bounds = quantile(flm_df$pet.spstd, c(0.01, 0.99), na.rm = T)
 
-# flm_df <- flm_df %>%
-#   mutate(outlier = (estimate_cwd.an<cwd_est_bounds[1]) |
-#            (estimate_cwd.an>cwd_est_bounds[2]) |
-#            (estimate_pet.an<pet_est_bounds[1]) |
-#            (estimate_pet.an>pet_est_bounds[2]) |
-#            (cwd.spstd<cwd_spstd_bounds[1]) |
-#            (cwd.spstd>cwd_spstd_bounds[2]) |
-#            (pet.spstd<pet_spstd_bounds[1]) |
-#            (pet.spstd>pet_spstd_bounds[2]))
 
 
 flm_df <- flm_df %>%
@@ -156,8 +141,6 @@ site_points=st_as_sf(trim_df,coords=c("longitude","latitude"),crs="+init=epsg:43
 vg <-variogram(estimate_cwd.an~1, site_points, cutoff = 1500, width = 10)
 vg.fit <- fit.variogram(vg, model = vgm(1, "Sph", 900, 1))
 plot(vg, vg.fit)
-# print(paste0("Range before hitting sill (km): "), as.character(vg.fit[2,3]))
-
 vg.range = vg.fit[2,3] * 1000
 
 
@@ -229,8 +212,6 @@ n_sites <- length(site_list)
 site_dist=st_distance(site_points)
 rownames(site_dist)=site_points$collection_id
 colnames(site_dist)=site_points$collection_id
-# save(site_dist,file=paste0(wdir,"out/site_distances.Rdat"))
-# load(paste0(wdir,"out/site_distances.Rdat"))
 
 dist_df <- as_tibble(site_dist) %>% 
   drop_units() 
@@ -238,10 +219,7 @@ dist_df <- as_tibble(site_dist) %>%
 dist_df <- dist_df %>%
   lazy_dt() %>% 
   mutate(collection_id = names(dist_df)) %>% 
-  # select(collection_id, site_list) %>% 
-  # filter(collection_id %in% site_list) %>% 
   mutate(across(.cols = !collection_id, ~(.x < vg.range))) %>% 
-  # mutate(across(.cols = !collection_id, ~ifelse((.x < range), collection_id, "DROP"))) %>% 
   as_tibble()
 
 block_list <- c()
@@ -252,7 +230,6 @@ for (site in site_list){
   block_list[site] <- list(block_sites)
 }
 save(block_list,file=paste0(output_dir,"spatial_blocks_old.Rdat"))
-# load(file=paste0(wdir,"out/second_stage/spatial_blocks.Rdat"))
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -373,7 +350,7 @@ run_ss <- function(data, outcome = "cwd_coef"){
   }
   formula <- as.formula(paste(outcome, " ~ cwd.spstd + I(cwd.spstd^2) + pet.spstd + I(pet.spstd^2)"))
   mod <- lm(formula, data=data, weights = error_weights)
-  # mod <- lm(formula, data=data)
+
   coefs <- mod %>% 
     tidy() %>% 
     pull(estimate) 
@@ -384,17 +361,13 @@ run_ss <- function(data, outcome = "cwd_coef"){
 ## Function to run second stage model for first stage CWD, 
 ## PET and Intercept terms and organize coefficients
 bs_ss <- function(data){
-  # data <- data %>% # Needed to add this since block bootstrap is returning nested tibble
-  #   unnest(cols = c(data))
   cwd_mod <- data %>% 
     run_ss(outcome = "cwd_coef")
   pet_mod <- data %>% 
     run_ss(outcome = "pet_coef")
   int_mod <- data %>% 
     run_ss(outcome = "int_coef")
-  # return(list("int_mod" = c(int_mod),
-  #             "cwd_mod" = c(cwd_mod),
-  #             "pet_mot" = c(pet_mod)))
+  
   return(list(int_int = int_mod[1],
               int_cwd = int_mod[2],
               int_cwd2 = int_mod[3],
@@ -413,8 +386,6 @@ bs_ss <- function(data){
 }
 
 bs_constant <- function(data){
-  # data <- data %>% # Needed to add this since block bootstrap is returning nested tibble
-  #   unnest(cols = c(data))
   const_sens <- data %>% 
     summarise(cwd_const_sens = weighted.mean(cwd_coef, cwd_errorweights),
               pet_const_sens = weighted.mean(pet_coef, pet_errorweights),

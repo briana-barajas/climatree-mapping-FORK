@@ -20,7 +20,6 @@
 # Package imports --------------------------------------------------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 library(fixest)
-# library(raster)
 library(sp)
 library(sf)
 library(rnaturalearth)
@@ -35,29 +34,16 @@ library(snow)
 library(profvis)
 library(tmap)
 library(tidylog)
-# 
-# n_cores <- availableCores()
-# future::plan(multisession, workers = n_cores)
-# 
-# my_seed <- 5597
-# 
-# n_mc <- 1000
-# 
-# 
+
+
 # #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # # Load data --------------------------------------------------------
 # #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# # Define path
-# data_dir <- "~/../../capstone/climatree/raw_data/"
-# output_dir <- "~/../../capstone/climatree/output/new-output/"
+## Define path
+data_dir <- "~/../../capstone/climatree/raw_data/"
+output_dir <- "~/../../capstone/climatree/output/"
 
-# Create output directories
-#out_dir <- paste0(wdir,"2_output/predictions/")
-# dir.create(file.path(out_dir), showWarnings = FALSE)
-#dir.create(file.path(paste0(output_dir, "sp_rwi/")), showWarnings = FALSE)
-# dir.create(file.path(paste0(out_dir, "sp_hot_cells/")), showWarnings = FALSE)
-
-for(species in spp_code_list){
+for(species in c(spp_code_list)){
   
   n_mc <- 1000
   n_cores <- availableCores()
@@ -72,7 +58,7 @@ mod_df <- mod_df %>%
   rename(iter_idx = boot_id)
 
 # 2. Species-standardized historic and future climate
-sp_clim <- read_rds(paste0(input_dir, "sp_clim_predictions.gz")) %>% 
+sp_clim <- read_rds(paste0(output_dir, "sp_clim_predictions.gz")) %>% 
   filter(sp_code == species)
 species_list <- sp_clim %>% select(sp_code)
             
@@ -305,66 +291,7 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
     rename(cwd_hist = cwd,
            pet_hist = pet)
   
-  print("Historic climate data prepared.")
-  
-  # ## Write out full mc rwi change results for subset of hot cells (pet ~= 1)
-  # hot_cells <- sp_hist %>% filter(pet_hist > 0.9, pet_hist < 1.1)
-  # hot_cells <- hot_cells %>% 
-  #   lazy_dt() %>% 
-  #   left_join(sp_predictions, by = c("x", "y")) %>% 
-  #   mutate(sp_code = spp_code) %>% 
-  #   select(sp_code, iter_idx, x, y, cwd_hist, pet_hist, rwi_pred_change) %>% 
-  #   as.data.frame()
-  # hot_cells %>% 
-  #   write_rds(file = paste0(out_dir, "sp_hot_cells/", spp_code, ".gz"), compress = "gz")
-  # 
-  # ## Contrast RWI change in wettest and dryest sites (all warm)
-  # pet_range <- sp_hist %>% pull(pet_hist) %>% quantile(c(0.75, 1))
-  # hot_cells <- sp_hist %>% filter(pet_hist > pet_range[1], pet_hist < pet_range[2])
-  # cwd_quantile <- hot_cells %>% pull(cwd_hist) %>% quantile(c(0.1, 0.9))
-  # wet_cells <- hot_cells %>% filter(cwd_hist < cwd_quantile[1]) %>% 
-  #   mutate(wet_dry = "wet")
-  # dry_cells <- hot_cells %>% filter(cwd_hist > cwd_quantile[2]) %>% 
-  #   mutate(wet_dry = "dry")
-  # extreme_cells <- rbind(wet_cells, dry_cells)
-  # 
-  # extreme_cells <- extreme_cells %>% 
-  #   lazy_dt() %>% 
-  #   left_join(sp_predictions, by = c("x", "y")) %>% 
-  #   group_by(iter_idx, wet_dry) %>% 
-  #   summarise(rwi_change = mean(rwi_pred_change)) %>% 
-  #   pivot_wider(names_from = wet_dry, values_from = rwi_change) %>% 
-  #   mutate(wet_dry_dif = wet - dry) %>% 
-  #   as.data.frame()
-  #   
-  # agg_stats <- agg_stats %>%
-  #   left_join(extreme_cells %>% select(iter_idx, wet_dry_dif), by = "iter_idx")
-  
-  
-  # ## Contrast RWI change under two scenarios for PET-centered sites
-  # pet_range = sp_hist$pet_hist %>% quantile(c(0.45, 0.55))
-  # pet_cells <- sp_hist %>% filter(pet_hist > pet_range[1], pet_hist < pet_range[2])
-  # cwd_quantile <- pet_cells %>% pull(cwd_hist) %>% quantile(c(0.1, 0.9))
-  # wet_cells <- pet_cells %>% filter(cwd_hist < cwd_quantile[1]) %>% 
-  #   mutate(wet_dry = "wet")
-  # dry_cells <- pet_cells %>% filter(cwd_hist > cwd_quantile[2]) %>% 
-  #   mutate(wet_dry = "dry")
-  # extreme_cells <- rbind(wet_cells, dry_cells)
-  # 
-  # extreme_cells <- extreme_cells %>% 
-  #   lazy_dt() %>% 
-  #   left_join(sp_predictions, by = c("x", "y")) %>% 
-  #   group_by(iter_idx, wet_dry) %>% 
-  #   summarise(rwi_pred_change = mean(rwi_pred_change),
-  #             rwi_pclim_change = mean(rwi_pclim_change)) %>% 
-  #   pivot_wider(names_from = wet_dry, values_from = c(rwi_pclim_change, rwi_pred_change)) %>% 
-  #   mutate(wet_pred_pclim_dif = rwi_pred_change_wet - rwi_pclim_change_wet,
-  #          dry_pred_pclim_dif = rwi_pred_change_dry - rwi_pclim_change_dry) %>% 
-  #   as.data.frame()
-  # 
-  # agg_stats <- agg_stats %>%
-  #   left_join(extreme_cells %>% select(iter_idx, wet_pred_pclim_dif, dry_pred_pclim_dif),
-  #             by = "iter_idx")
+  print("Historic climate data prepared")
   
   
   ## For each species, calculate cell-wise quantiles of variables from n_mc runs
@@ -397,10 +324,6 @@ calc_rwi_quantiles <- function(spp_code, mc_data, parallel = TRUE){
               cwd_sens = mean(cwd_sens),
               pet_sens = mean(pet_sens),
               int_sens = mean(intercept),
-              # cwd_cmip_start = mean(cwd_cmip_start),
-              # pet_cmip_start = mean(pet_cmip_start),
-              # cwd_cmip_end = mean(cwd_cmip_end),
-              # pet_cmip_end = mean(pet_cmip_end),
               sp_code = spp_code,
               .groups = "drop")
   
@@ -467,20 +390,6 @@ mc_nests <- sp_mc %>%
   drop_na()
 
 
-# Generally have memory issues with 38 (LAGM), and 93 (PISY) - need to run these with two cores
-# large_range_sp <- c("lagm", "pisy")
-# spp_code = "abal"
-# mc_data = mc_nests %>% filter(sp_code == spp_code) %>% pull(data)
-# mc_data = mc_data[[1]]
-# parallel = FALSE
-
-# mc_nests_large <- mc_nests %>% 
-#   filter((sp_code %in% large_range_sp)) %>% 
-#   mutate(predictions = pmap(list(spp_code = sp_code,
-#                                  mc_data = data,
-#                                  parallel = TRUE),
-#                             .f = calc_rwi_quantiles))
-
 mc_nests_small <- mc_nests %>% 
   # filter(!(sp_code %in% large_range_sp)) %>% 
   mutate(predictions = pmap(list(spp_code = sp_code,
@@ -489,205 +398,6 @@ mc_nests_small <- mc_nests %>%
                             .f = calc_rwi_quantiles)) 
 
 }
-
-# agg_stats <- mc_nests_small %>% 
-#   select(-data) %>% 
-#   unnest(predictions) %>% 
-#   write_rds(file = paste0(output_dir, "mc_agg_stats_pipo.gz"), compress = "gz")
-# 
-# 
-# test <- agg_stats %>% 
-#   group_by(iter_idx) %>% 
-#   summarise(rwi_pred_change = mean(rwi_pred_change))
-# test %>%
-#   pull(rwi_pred_change) %>% 
-#   quantile(c(0.025, 0.5, 0.975))
-# 
-# 
-
-
-# # Profiling of main function
-# spp_code = "juex"
-# mc_data = (mc_nests %>% filter(sp_code == spp_code) %>% pull(data))[[1]]
-# l = profvis(calc_rwi_quantiles(spp_code, mc_data))
-
-
-
-
-
-
-# %>% 
-#   select(-data) %>% 
-#   unnest(predictions)
-
-# mc_nests %>% 
-#   saveRDS(file = paste0(wdir,"out/predictions/rwi_predictions.rds"))
-
-
-# # # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# # # Thought experiments - partialling out mechanisms    ---------------
-# # # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# # calc_rwi_partial_sens <- function(cmip_rast, sensitivity){ # NOTE: Should the means be calculated across full range rather than by each species?
-# #   mean_fut_cwd <- cmip_rast %>% subset("cwd.spstd") %>% cellStats(stat = "mean")
-# #   mean_fut_pet <- cmip_rast %>% subset("pet.spstd") %>% cellStats(stat = "mean")
-# #   cwd_sens = sensitivity %>% subset("cwd_sens")
-# #   pet_sens = sensitivity %>% subset("pet_sens")
-# #   intercept = sensitivity %>% subset("intercept")
-# #   rwi_rast <- intercept + (mean_fut_cwd * cwd_sens) + (mean_fut_pet * pet_sens)
-# #   names(rwi_rast) = "rwi_psens"
-# #   return(rwi_rast)
-# # }
-# # 
-# # calc_rwi_partial_clim <- function(cmip_rast, sensitivity){ # NOTE: Should the means be calculated across full range rather than by each species?
-# #   mean_cwd_sens <- sensitivity %>% subset("cwd_sens") %>% cellStats(stat = "mean")
-# #   mean_pet_sens <- sensitivity %>% subset("pet_sens") %>% cellStats(stat = "mean")
-# #   mean_intercept <-sensitivity %>% subset("intercept") %>% cellStats(stat = "mean") 
-# #   rwi_rast <- mean_intercept + (cmip_rast$cwd.spstd * mean_cwd_sens) + (cmip_rast$pet.spstd * mean_pet_sens)
-# #   names(rwi_rast) = "rwi_pclim"
-# #   return(rwi_rast)
-# # }
-# # 
-# # 
-# # sp_predictions <- sp_predictions %>% 
-# #   mutate(rwi_predictions_partial_sens = map2(.x = clim_future_sp, .y = sensitivity, calc_rwi_partial_sens),
-# #          rwi_predictions_partial_clim = map2(.x = clim_future_sp, .y = sensitivity, calc_rwi_partial_clim))
-# 
-# 
-# #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# # Stack rasters into dataframe ------------------------------------
-# #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# create_prediction_df <- function(spp_predictions){
-#   sp_fut <- (spp_predictions %>% 
-#                pull(clim_future_sp))[[1]]
-#   names(sp_fut) <- c("cwd.fut", "pet.fut")
-#   
-#   sp_hist <- (spp_predictions %>% 
-#                 pull(clim_historic_sp))[[1]]
-#   sp_sens  <- (spp_predictions %>% 
-#                  pull(sensitivity))[[1]]
-#   sp_rwi  <- (spp_predictions %>% 
-#                 pull(rwi_predictions))[[1]]
-#   
-#   sp_rwi_psens  <- (spp_predictions %>% 
-#                       pull(rwi_predictions_partial_sens))[[1]]
-#   
-#   sp_rwi_pclim  <- (spp_predictions %>% 
-#                       pull(rwi_predictions_partial_clim))[[1]]
-#   
-#   clim_compare <- brick(c(sp_fut, sp_hist, sp_sens, sp_rwi, sp_rwi_psens, sp_rwi_pclim))
-#   clim_compare <- clim_compare %>% 
-#     as.data.frame(xy = TRUE) %>% 
-#     drop_na()
-#   return(clim_compare)
-# }
-# 
-# sp_prediction_test <- sp_predictions %>% 
-#   group_by(sp_code, iter_idx) %>% 
-#   nest() %>% 
-#   mutate(pred_df = map(data, create_prediction_df)) %>% 
-#   select(-data) %>% 
-#   unnest(cols = pred_df) %>% 
-#   mutate(cwd_change = cwd.fut - cwd.spstd,
-#          pet_change = pet.fut - pet.spstd,
-#          rwi_null = cwd.spstd * cwd_sens + pet.spstd * pet_sens + intercept,
-#          rwi_change = rwi_pred - rwi_null,
-#          rwi_change_psens = rwi_psens - rwi_null,
-#          rwi_change_pclim = rwi_pclim - rwi_null)
-# 
-# 
-# sp_predictions %>% 
-#   saveRDS(file = paste0(wdir,"out/predictions/sp_predictions.rds") )
-
-
-
-
-
-# crs_template <- crs(cwd_future)
-# cwd_df <- cwd_rast %>% as.data.frame(xy = TRUE) 
-# raster_template <- cwd_df %>% select(x,y)
-# cwd_df <- cwd_df %>% 
-#   drop_na()
-# 
-# cwd_df2 <- raster_template %>% 
-#   left_join(cwd_df, by = c("x", "y"))
-# cwd_rast2 <- rasterFromXYZ(cwd_df2, crs = crs)
-# 
-# tm_raster(cwd_rast2)
-# data("World")
-# 
-# tmap_mode("view")
-# tm_shape(cwd_rast) +
-#   tm_raster()
-# 
-# tmap_mode("view")
-# tm_shape(cwd_vals) +
-#   tm_raster()
-# 
-# 
-# 
-# 
-# 
-# 
-# ############ FUNCTION GRAVEYARD
-# 
-# calc_rwi <- function(sppp_code, cmip_id, sensitivity){
-#   ## Function used to predict species' RWI rasters based on predicted 
-#   ## sensitivity raster and assigned CMIP model of future climate
-#   
-#   sp_fut_clim <- readRDS(paste0(sp_fut_clim_dir, sppp_code, ".gz"))
-#   
-#   cmip_rast <- sp_fut_clim %>% 
-#     filter(cmip_idx == cmip_id) %>% 
-#     pull(clim_future_sp)
-#   
-#   cwd_sens = sensitivity %>% subset("cwd_sens")
-#   pet_sens = sensitivity %>% subset("pet_sens")
-#   intercept = sensitivity %>% subset("intercept")
-#   rwi_rast <- intercept + (cmip_rast[[1]]$cwd.spstd * cwd_sens) + (cmip_rast[[1]]$pet.spstd * pet_sens)
-#   names(rwi_rast) = "rwi_pred"
-#   return(rwi_rast)
-# }
-# 
-# quantiles <- function(x){
-#   ## Defines quantiles used to summarize MC runs
-#   quantile(x, c(0.025, 0.975), na.rm=TRUE)
-# }
-# 
-# # extract_quantiles <- function(rwi_preds){
-# #   ## Extracts desired quantiles for MC runs
-# #   
-# #   rwi_quantiles <- rwi_preds %>% 
-# #     pull(rwi_predictions) %>%
-# #     brick() %>% 
-# #     calc(quantiles)
-# #   return(rwi_quantiles)
-# # }
-# 
-# 
-# calc_mean_fut_clim <- function(sppp_code){
-#   sp_fut_clim <- readRDS(paste0(sp_fut_clim_dir, sppp_code, ".gz"))
-#   clim_pulls <- sp_fut_clim %>%
-#     mutate(cwd.fut = pmap(list(brick = clim_future_sp, layer_name = "cwd.spstd"),
-#                           .f = pull_layer),
-#            pet.fut = pmap(list(brick = clim_future_sp, layer_name = "pet.spstd"),
-#                           .f = pull_layer))
-#   
-#   cwd.fut.q <- clim_pulls %>%
-#     pull(cwd.fut) %>%
-#     brick()
-#   cwd.fut.q <- raster::mean(cwd.fut.q)
-#   names(cwd.fut.q) = "cwd.fut"
-#   
-#   pet.fut.q <- clim_pulls %>%
-#     pull(pet.fut) %>%
-#     brick()
-#   pet.fut.q <- raster::mean(pet.fut.q)
-#   names(pet.fut.q) = "pet.fut"
-#   
-#   out_brick <- brick(c(cwd.fut.q, pet.fut.q))
-#   return(out_brick)
-# }
-
 
 
 
